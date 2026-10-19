@@ -18,6 +18,8 @@ if ! mutagen sync list "$name" >/dev/null 2>&1; then
   rsync -az --mkpath --update "$@" "$dir/" "$host:$dir/"
   set --
   for i in $ignores; do set -- "$@" -i "$i"; done
+  # git's index is a per-machine stat cache: seeded once above, then each side keeps its own.
+  set -- "$@" -i .git/index -i .git/index.lock
   mutagen sync create --name "$name" -m two-way-safe --symlink-mode posix-raw "$@" "$dir" "$host:$dir" >/dev/null
 fi
 mutagen sync flush "$name"

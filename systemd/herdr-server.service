@@ -1,0 +1,10 @@
+[Unit]
+Description=herdr server (panes keep running with no client attached)
+
+[Service]
+ExecStart=%h/.local/bin/herdr server
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

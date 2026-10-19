@@ -1,0 +1,13 @@
+id = "femme"
+name = "femme"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Fork the focused agent, conversation and working tree, onto your always-on VPS. Claude Code, Codex, Pi."
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "fork-remote"
+title = "Fork agent to VPS"
+description = "Copy the focused agent's repo and conversation to the VPS and continue it in a new workspace there"
+contexts = ["pane"]
+command = ["sh", "fork-remote.sh"]

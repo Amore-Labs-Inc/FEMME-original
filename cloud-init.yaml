@@ -1,0 +1,25 @@
+#cloud-config
+# __USER__ and __PUBKEY__ are filled in by provision.sh.
+hostname: __HOST__
+users:
+  - name: __USER__
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys: ["__PUBKEY__"]
+ssh_pwauth: false
+disable_root: true
+package_update: true
+package_upgrade: true
+packages: [mosh, jq, git, rsync, build-essential, curl, unzip]
+swap:
+  filename: /swapfile
+  size: 8G
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-femme.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+runcmd:
+  - [loginctl, enable-linger, __USER__]
+  - [systemctl, restart, ssh]

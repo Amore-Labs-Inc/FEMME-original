@@ -1,0 +1,11 @@
+[Unit]
+Description=Push herdr agent state changes to ntfy
+After=herdr-server.service
+
+[Service]
+ExecStart=%h/femme/notify.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

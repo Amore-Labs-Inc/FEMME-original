@@ -18,6 +18,6 @@ while sleep 5; do
     jq -nc --arg t "$NTFY_TOPIC" --arg title "$title" --arg m "$msg ($pane)" --argjson p $prio \
       '{topic:$t, title:$title, message:$m, priority:$p}' \
       | curl -fsS -m 10 -d @- https://ntfy.sh/ >/dev/null || echo "ntfy push failed for $pane" >&2
-  done < <("$herdr" api snapshot 2>/dev/null | jq -r '.. | objects | select(has("agent_status"))
+  done < <("$herdr" api snapshot 2>/dev/null | jq -r '[.. | objects | select(has("agent_status") and has("pane_id"))] | unique_by(.pane_id)[]
     | [.pane_id, .agent_status, (.terminal_title_stripped // .agent // "agent")] | @tsv')
 done

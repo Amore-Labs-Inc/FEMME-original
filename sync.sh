@@ -16,6 +16,13 @@ r -R --ignore-missing-args \
   .local/bin/rtk \
   "$HOST:"
 
+# Claude's first-run flags, folder trust and the MCP servers that work headless.
+# Merged into the VPS copy, so its own login (oauthAccount) stays.
+jq --arg mcp "${CLAUDE_MCP:-context7 codegraph}" '{theme, hasCompletedOnboarding, lastOnboardingVersion,
+    projects: (.projects // {} | map_values({hasTrustDialogAccepted})),
+    mcpServers: (.mcpServers // {} | with_entries(select(.key as $k | $mcp | split(" ") | index($k))))}' ~/.claude.json \
+  | ssh "$HOST" 'f=~/.claude.json; [ -s $f ] || echo {} > $f; jq -s ".[0] * .[1]" $f - > $f.tmp && mv $f.tmp $f'
+
 ssh "$HOST" "HERDR_VERSION=$(herdr --version | cut -d' ' -f2) ~/femme/bootstrap.sh"
 
 # Clone needs `gh auth login` on the VPS first; until then private repos are skipped.

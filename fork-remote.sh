@@ -47,9 +47,13 @@ esac
 [ -n "$file" ] || fail "could not find the $kind session file for $ref"
 
 root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || root=$cwd
-notify "Copying $root to $host"
-rsync -az --mkpath --include='.env*' --filter=':- .gitignore' "$root/" "$host:$root/" \
-  || fail "could not copy $root to $host"
+case $root in
+  "$HOME"/?*)
+    notify "Copying $root to $host"
+    rsync -az --mkpath --include='.env*' --filter=':- .gitignore' "$root/" "$host:$root/" \
+      || fail "could not copy $root to $host" ;;
+  *) ssh "$host" mkdir -p "$(printf %q "$cwd")" ;;  # never ship /tmp or all of $HOME
+esac
 rsync -az --mkpath "$file" "$host:$file" || fail "could not copy the session file to $host"
 
 out=$(remote workspace create --cwd "$cwd" --focus 2>&1) || fail "could not create a workspace on $host: $out"

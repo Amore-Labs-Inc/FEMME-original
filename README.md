@@ -6,11 +6,11 @@ Always-on [herdr](https://herdr.dev) on an AWS VPS. Start agents from your lapto
 - Panes survive SSH drops and lid closes. After a VPS reboot herdr restores the layout, resumes agent conversations and replays screen history.
 - ntfy push to your phone when an agent is blocked or done.
 - mosh for the phone, so wifi/cellular switches and sleep don't kill the session.
-- A herdr plugin that forks a local agent (conversation + working tree) onto the VPS.
+- A herdr plugin that forks a local agent onto the VPS, conversation and folder. The folder then stays in live two-way sync ([Mutagen](https://mutagen.io)), so VPS work shows up on the laptop when it wakes.
 
 ## Setup
 
-Needs: AWS CLI logged in, `~/.ssh/id_ed25519`, herdr, jq, rsync.
+Needs: AWS CLI logged in, `~/.ssh/id_ed25519` (no passphrase, the Mutagen service has no ssh-agent), herdr, jq, rsync, [mutagen](https://github.com/mutagen-io/mutagen/releases) in `~/.local/bin`.
 
 ```sh
 ./provision.sh                              # VPS + security group + Elastic IP, writes .env and ~/.ssh/config "Host agentbox"
@@ -20,7 +20,6 @@ ssh agentbox                                # one-time logins, credentials are n
 #   claude            -> /login, paste the URL
 #   codex login --device-auth
 #   gh auth login && gh auth setup-git
-./sync.sh                                   # again: now clones your repos and copies their .env files
 ```
 
 Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`). `.env` is gitignored and holds your IP and ntfy topic.
@@ -30,6 +29,7 @@ Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`). `.env` i
 ```sh
 herdr machine add agentbox --label agentbox --remote-session default
 herdr plugin link "$PWD"                    # or: herdr plugin install Darkosxl/FEMME --yes
+cp systemd/mutagen.service ~/.config/systemd/user/ && systemctl --user enable --now mutagen
 ```
 
 Add to `~/.config/herdr/config.toml`, then `herdr server reload-config`:
@@ -42,7 +42,17 @@ command = "femme.fork-remote"
 description = "fork agent to VPS"
 ```
 
-Local and VPS workspaces show side by side. Local ones die when the laptop sleeps; `prefix+shift+v` on a local agent forks it to the VPS and leaves the local one running. It copies the repo (uncommitted changes and `.env*` included, other gitignored files not) and the session file. Works for Claude Code, Codex and Pi.
+Local and VPS workspaces show side by side. Local ones die when the laptop sleeps; `prefix+shift+v` on a local agent forks it to the VPS and leaves the local one running:
+
+1. The agent's folder (its git root, or its cwd; git not required) is put in two-way sync with the same path on the VPS. The first time, rsync seeds it (never overwriting newer VPS files); after that Mutagen streams changes both ways.
+2. The session file is copied, and the agent starts there in its own fork mode. Claude Code, Codex and Pi are supported.
+
+Sync rules:
+- `node_modules .venv venv __pycache__ target .cache .next` stay on their own side; reinstall deps on the VPS.
+- Mode is two-way-safe. If both sides change the same file, that file pauses with a conflict and neither copy is overwritten. See them with `mutagen sync list`.
+- Deletions propagate both ways, like any other change.
+- Only folders inside `$HOME` are synced; an agent in `/tmp` gets an empty folder on the VPS.
+- `sh sync-dir.sh <dir>` syncs a folder without forking anything. `mutagen sync terminate <name>` stops it, and both copies stay.
 
 ### iPhone
 
@@ -57,10 +67,12 @@ Local and VPS workspaces show side by side. Local ones die when the laptop sleep
 |---|---|---|
 | `provision.sh` | laptop | Creates the instance. Safe to rerun; reuses everything tagged `femme`. |
 | `cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, mosh, 8 GB swap, linger. |
-| `sync.sh` | laptop | Copies config (`~/.claude` minus credentials and history, herdr, mise), repos, and `.env` files. |
+| `sync.sh` | laptop | Copies config: `~/.claude` minus credentials and history, herdr, mise. Merges onboarding, trust and portable MCP servers into the VPS `~/.claude.json`. |
+| `sync-dir.sh` | laptop | Puts one folder in live two-way sync with the VPS. |
 | `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units. |
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
 | `fork-remote.sh` | laptop | The herdr plugin action. |
+| `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
 
 ## Cost
 

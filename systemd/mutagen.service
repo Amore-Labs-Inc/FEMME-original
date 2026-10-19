@@ -1,0 +1,10 @@
+# Laptop side: keeps fork sync sessions running across reboots and lid closes.
+[Unit]
+Description=Mutagen daemon (two-way sync of forked folders with the VPS)
+
+[Service]
+ExecStart=%h/.local/bin/mutagen daemon run
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

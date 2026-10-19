@@ -1,7 +1,7 @@
 #!/bin/sh
 # Fork the focused local agent onto the VPS and keep the local one running.
-# Copies the repo (uncommitted changes and .env* included, .gitignored files not)
-# and the agent's session file to the same paths on the VPS, then starts the
+# Puts the agent's folder (git repo root, or cwd) in live two-way sync with the
+# same path on the VPS (sync-dir.sh), copies the session file, then starts the
 # agent there in its own fork mode, like forkr does locally.
 #
 # Usage: fork-remote.sh [pane-id]     Host: $FEMME_HOST (default agentbox)
@@ -22,6 +22,7 @@ fail() {
 }
 
 command -v jq >/dev/null 2>&1 || fail "jq is required but not on PATH"
+command -v mutagen >/dev/null 2>&1 || fail "mutagen is required: https://mutagen.io"
 
 target=${1:-}
 [ -n "$target" ] || target=$(printf '%s' "${HERDR_PLUGIN_CONTEXT_JSON:-}" | jq -r '.focused_pane_id // empty' 2>/dev/null)
@@ -49,9 +50,9 @@ esac
 root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || root=$cwd
 case $root in
   "$HOME"/?*)
-    notify "Copying $root to $host"
-    rsync -az --mkpath --include='.env*' --filter=':- .gitignore' "$root/" "$host:$root/" \
-      || fail "could not copy $root to $host" ;;
+    notify "Syncing $root with $host"
+    sh "${HERDR_PLUGIN_ROOT:-$(dirname "$0")}/sync-dir.sh" "$root" >/dev/null 2>&1 \
+      || fail "could not sync $root with $host" ;;
   *) ssh "$host" mkdir -p "$(printf %q "$cwd")" ;;  # never ship /tmp or all of $HOME
 esac
 rsync -az --mkpath "$file" "$host:$file" || fail "could not copy the session file to $host"

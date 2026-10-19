@@ -64,7 +64,9 @@ Do it end to end: implement, run the project's checks and tests, commit, push th
 
 write_meta() {  # state usage_json
   [ -s "$STATE/repos" ] && [ -z "$(find "$STATE/repos" -mmin +60)" ] \
-    || gh repo list --limit 300 --json nameWithOwner -q '.[].nameWithOwner' > "$STATE/repos" 2>/dev/null
+    || for owner in "" $(gh api user/orgs --jq '.[].login' 2>/dev/null); do  # yours, then every org you're in
+         gh repo list $owner --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null
+       done > "$STATE/repos"
   jq -nc --arg s "$1" --argjson u "${2:-null}" --argjson cap "$CAP" --rawfile r "$STATE/repos" \
     '{state:$s, usage:$u, cap:$cap, repos:($r | split("\n") | map(select(. != ""))), updated:now}' > "$STATE/meta.tmp" \
     && mv "$STATE/meta.tmp" "$STATE/meta.json"
@@ -74,7 +76,7 @@ mkdir -p "$WORK"
 last_usage=null
 while sleep 60; do
   issues=$(api "$B/api/issues") || { log "board is down"; continue; }
-  if [ "$(jq '[.[] | select(.status=="open" or .status=="working" or .status=="paused")] | length' <<<"$issues")" = 0 ]; then
+  if [ "$(jq '[.[] | select(.status=="open" or .status=="working" or .status=="waiting" or .status=="paused")] | length' <<<"$issues")" = 0 ]; then
     write_meta "idle: queue is empty" "$last_usage"
     continue
   fi
@@ -84,8 +86,8 @@ while sleep 60; do
   pct=$(jq -r '.percent // 0 | floor' <<<"${u:-null}")
   over=$(( pct >= CAP ))
 
-  # Running issues: opened a PR, or over budget, or stopped on their own.
-  while IFS=$'\t' read -r id repo; do
+  # Active issues: opened a PR, went over budget, stopped to ask you, or got your reply.
+  while IFS=$'\t' read -r id repo status; do
     [ -n "$id" ] || continue
     st=$(agent_status "$id")
     pr=$(pr_for "$repo" "$id")
@@ -94,14 +96,18 @@ while sleep 60; do
       patch "$id" "$(jq -nc --arg u "$pr" '{status:"pr", pr_url:$u, note:""}')"
     elif [ -z "$st" ]; then
       patch "$id" "$(note failed "its workspace was closed")"
-    elif [ "$over" = 1 ]; then
+    elif [ "$st" = working ] && [ "$over" = 1 ]; then
       log "#$id paused at $pct%"
-      herdr agent send-keys "femme-$id" Escape >/dev/null 2>&1
+      herdr agent send-keys "femme-$id" esc >/dev/null 2>&1
       patch "$id" "$(note paused "paused at $pct% of the 5-hour window, continues after it resets")"
-    elif [ "$st" = done ] || [ "$st" = idle ]; then
-      patch "$id" "$(note failed "Claude stopped without opening a PR; open its workspace to see why, then Retry")"
+    elif [ "$st" = working ] && [ "$status" = waiting ]; then
+      patch "$id" "$(note working "")"
+    elif [ "$st" = blocked ] && [ "$status" = working ]; then
+      patch "$id" "$(note waiting "Claude is asking for your approval: open Chat")"
+    elif { [ "$st" = done ] || [ "$st" = idle ]; } && [ "$status" = working ]; then
+      patch "$id" "$(note waiting "Claude stopped without a PR: read its last message in Chat")"
     fi
-  done < <(jq -r '.[] | select(.status=="working") | [.id, .repo] | @tsv' <<<"$issues")
+  done < <(jq -r '.[] | select(.status=="working" or .status=="waiting") | [.id, .repo, .status] | @tsv' <<<"$issues")
 
   if [ "$over" = 1 ]; then
     write_meta "paused until the window resets ($pct% used)" "${u:-null}"

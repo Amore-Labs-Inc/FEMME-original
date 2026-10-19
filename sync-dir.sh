@@ -15,7 +15,7 @@ ignores="node_modules .venv venv __pycache__ target .cache .next"
 if ! mutagen sync list "$name" >/dev/null 2>&1; then
   set --
   for i in $ignores; do set -- "$@" --exclude="$i"; done
-  rsync -az --mkpath --update "$@" "$dir/" "$host:$dir/"
+  rsync -az --mkpath --update --partial "$@" "$dir/" "$host:$dir/"  # --partial: big files resume
   set --
   for i in $ignores; do set -- "$@" -i "$i"; done
   # git's index is a per-machine stat cache: seeded once above, then each side keeps its own.

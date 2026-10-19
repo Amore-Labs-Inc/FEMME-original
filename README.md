@@ -61,6 +61,15 @@ Sync rules:
 3. Add host: `darkwarro@<IP from .env>`, mosh on, command `herdr`.
 4. In ntfy, subscribe to the `NTFY_TOPIC` from `.env`. Anyone who knows the topic can read your pushes, so keep it secret.
 
+## Issues board
+
+Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point an A record (DNS only) for `BOARD_URL`'s host at the VPS, rerun `./provision.sh` (opens 80/443) and `./sync.sh`.
+
+- Sign in with a magic link sent to `BOARD_EMAIL` (once, 15 minutes); the cookie lasts 7 days.
+- Add an issue: pick a repo, describe the work. The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
+- Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
+- Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Both are env vars on `femme-worker.service`.
+
 ## Files
 
 | File | Runs on | Does |
@@ -72,6 +81,8 @@ Sync rules:
 | `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units. |
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
 | `fork-remote.sh` | laptop | The herdr plugin action. |
+| `board/` | VPS | The issues board server (Rust). |
+| `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |
 | `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
 
 ## Cost

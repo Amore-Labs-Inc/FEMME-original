@@ -2,6 +2,7 @@
 # Runs on the VPS (sync.sh copies this repo to ~/femme first). Safe to rerun.
 set -euo pipefail
 cd "$(dirname "$0")"
+. ./.env
 export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
 
 # Toolchains + claude/codex/pi/gh from the synced ~/.config/mise/config.toml
@@ -30,10 +31,19 @@ for a in claude codex pi opencode; do herdr integration install "$a" || echo "WA
 grep -q '^\[experimental\]' ~/.config/herdr/config.toml 2>/dev/null \
   || printf '\n[experimental]\n# single-user box: keep screen history across reboots\npane_history = true\n' >> ~/.config/herdr/config.toml
 
+units="herdr-server herdr-notify"
+if [ -n "${BOARD_URL:-}" ]; then
+  # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).
+  command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }
+  printf '%s {\n\treverse_proxy 127.0.0.1:8787\n}\n' "${BOARD_URL#https://}" | sudo tee /etc/caddy/Caddyfile >/dev/null
+  sudo systemctl reload-or-restart caddy
+  units="$units femme-board femme-worker"
+fi
+
 mkdir -p ~/.config/systemd/user
-cp systemd/*.service ~/.config/systemd/user/
+for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
 systemctl --user daemon-reload
-systemctl --user enable --now herdr-server herdr-notify
-systemctl --user restart herdr-notify
+systemctl --user enable --now $units
+systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker}
 herdr server reload-config >/dev/null 2>&1 || true
-systemctl --user is-active herdr-server herdr-notify
+systemctl --user is-active $units

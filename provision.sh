@@ -20,6 +20,11 @@ if [ "$sg" = None ]; then
     'IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=0.0.0.0/0}]' \
     'IpProtocol=udp,FromPort=60000,ToPort=61000,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null
 fi
+if [ -n "${BOARD_URL:-}" ]; then  # board: Caddy needs 80 for the certificate challenge, 443 to serve
+  aws ec2 authorize-security-group-ingress --group-id "$sg" --ip-permissions \
+    'IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges=[{CidrIp=0.0.0.0/0}]' \
+    'IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null 2>&1 || true  # already open
+fi
 
 id=$(aws ec2 describe-instances --query 'Reservations[0].Instances[0].InstanceId' \
   --filters Name=tag:Name,Values=femme Name=instance-state-name,Values=pending,running,stopping,stopped)

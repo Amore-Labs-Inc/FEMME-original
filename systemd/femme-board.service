@@ -1,0 +1,11 @@
+[Unit]
+Description=FEMME issues board (localhost; Caddy serves it over HTTPS)
+
+[Service]
+EnvironmentFile=%h/femme/.env
+ExecStart=%h/.local/bin/femme-board
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=FEMME worker: runs board issues as herdr Claude agents within the usage budget
+After=femme-board.service herdr-server.service
+
+[Service]
+Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/femme/worker.sh
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

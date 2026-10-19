@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FEMME board</title>
+<style>
+  :root { --bg: #f6f5f2; --card: #fff; --ink: #1d1c1a; --muted: #6b6862; --line: #e3e0da; --accent: #2f5d50; --on-accent: #fff;
+          --work: #2f5d50; --pause: #9a6b12; --pr: #3d4fa8; --bad: #a33a2a; --done: #8a877f; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --card: #201f1d; --ink: #eceae6; --muted: #9d9a94; --line: #34322f; --accent: #7fb8a4; --on-accent: #10201b;
+            --work: #7fb8a4; --pause: #e0b25a; --pr: #9aa8f0; --bad: #e08a7a; --done: #8a877f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .02em; flex: 1; }
+  .pill { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--card); }
+  .bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 4px; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  form, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  form { padding: 14px; display: grid; gap: 10px; margin-bottom: 20px; }
+  input, textarea, button { font: inherit; border-radius: 9px; }
+  input, textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 10px 12px; }
+  textarea { min-height: 90px; resize: vertical; }
+  button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 7px 12px; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; padding: 10px 14px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; display: flex; gap: 8px; align-items: center; }
+  h2 b { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .card { padding: 12px 14px; margin-bottom: 8px; }
+  .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+  .title { font-weight: 600; margin: 2px 0; overflow-wrap: anywhere; }
+  .body { white-space: pre-wrap; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; margin-top: 4px; }
+  .note { font-size: 13px; margin-top: 6px; overflow-wrap: anywhere; }
+  .actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  a { color: var(--pr); }
+  .empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .err { color: var(--bad); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>FEMME</h1>
+    <div class="pill" id="usage">usage: waiting for worker</div>
+    <button id="out">Sign out</button>
+  </header>
+
+  <form id="new">
+    <input id="repo" list="repos" placeholder="owner/repo" required autocapitalize="off" autocorrect="off" spellcheck="false">
+    <datalist id="repos"></datalist>
+    <input id="title" placeholder="What should be done?" required>
+    <textarea id="body" placeholder="Details, acceptance criteria, files to look at (optional)"></textarea>
+    <button class="primary">Add to queue</button>
+    <div class="err" id="err" role="alert"></div>
+  </form>
+
+  <div id="board"></div>
+</div>
+<script>
+  const SECTIONS = [
+    ['working', 'Working', '--work'], ['paused', 'Paused', '--pause'], ['open', 'Queue', '--muted'],
+    ['pr', 'PR ready', '--pr'], ['failed', 'Failed', '--bad'], ['done', 'Done', '--done'],
+  ];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const api = async (url, opts = {}) => {
+    const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' } });
+    if (r.status === 401) location.replace('/login');
+    return r;
+  };
+  const ago = t => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
+  const clock = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  function card(i) {
+    const acts = [];
+    if (['paused', 'failed', 'done'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-set="open">Retry</button>`);
+    if (i.status === 'pr') acts.push(`<button data-id="${i.id}" data-set="done">Merged, done</button>`);
+    if (i.status !== 'working') acts.push(`<button data-id="${i.id}" data-del>Delete</button>`);
+    return `<div class="card">
+      <div class="meta"><span>#${i.id}</span><span>${esc(i.repo)}</span><span>${ago(i.updated || i.created)}</span></div>
+      <div class="title">${esc(i.title)}</div>
+      ${i.body ? `<details><summary>details</summary><div class="body">${esc(i.body)}</div></details>` : ''}
+      ${i.note ? `<div class="note">${esc(i.note)}</div>` : ''}
+      ${i.pr_url ? `<div class="note"><a href="${esc(i.pr_url)}" target="_blank" rel="noopener">${esc(i.pr_url)}</a></div>` : ''}
+      ${acts.length ? `<div class="actions">${acts.join('')}</div>` : ''}
+    </div>`;
+  }
+
+  async function refresh() {
+    const [issues, meta] = await Promise.all([api('/api/issues').then(r => r.json()), api('/api/meta').then(r => r.json())]);
+    $('board').innerHTML = SECTIONS.map(([key, label, color]) => {
+      const rows = issues.filter(i => i.status === key).sort((a, b) => key === 'open' ? a.id - b.id : (b.updated || 0) - (a.updated || 0));
+      if (key === 'done' && rows.length) return `<details><summary><h2 style="display:inline-flex"><b style="background:var(${color})"></b>${label} (${rows.length})</h2></summary>${rows.map(card).join('')}</details>`;
+      return `<h2><b style="background:var(${color})"></b>${label}${rows.length ? ` (${rows.length})` : ''}</h2>${rows.length ? rows.map(card).join('') : '<div class="empty">nothing here</div>'}`;
+    }).join('');
+    if (meta.usage) {
+      const u = meta.usage, cap = meta.cap ?? 60;
+      $('usage').innerHTML = `Claude ${u.percent}% · agents pause at ${cap}% · resets ${u.resets_at ? clock(u.resets_at) : '?'}${meta.state ? ' · ' + esc(meta.state) : ''}
+        <div class="bar"><i style="width:${Math.min(100, u.percent)}%"></i></div>`;
+    }
+    $('repos').innerHTML = (meta.repos || []).map(r => `<option value="${esc(r)}">`).join('');
+  }
+
+  $('new').onsubmit = async e => {
+    e.preventDefault();
+    $('err').textContent = '';
+    const r = await api('/api/issues', { method: 'POST', body: JSON.stringify({ repo: $('repo').value.trim(), title: $('title').value, body: $('body').value }) });
+    if (!r.ok) return $('err').textContent = (await r.json()).error;
+    $('title').value = $('body').value = '';
+    refresh();
+  };
+
+  $('board').onclick = async e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.del !== undefined) {
+      if (!confirm('Delete this issue?')) return;
+      await api(`/api/issues/${b.dataset.id}`, { method: 'DELETE' });
+    } else {
+      await api(`/api/issues/${b.dataset.id}`, { method: 'PATCH', body: JSON.stringify({ status: b.dataset.set, note: '' }) });
+    }
+    refresh();
+  };
+
+  $('out').onclick = async () => { await api('/api/logout', { method: 'POST', body: '{}' }); location.replace('/login'); };
+
+  refresh();
+  setInterval(refresh, 10000);
+</script>
+</body>
+</html>

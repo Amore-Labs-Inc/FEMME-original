@@ -68,6 +68,8 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 - Sign in with a magic link sent to `BOARD_EMAIL` (once, 15 minutes); the cookie lasts 7 days.
 - Add an issue: pick a repo, describe the work. The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
+- **Chat** on a card opens that agent's live screen: reply, press 1/2/3/Enter/Esc, or end it.
+- **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, chat with it the same way, or close it.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Both are env vars on `femme-worker.service`.
 
 ## Files
@@ -87,4 +89,4 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 
 ## Cost
 
-m7i-flex.xlarge (4 vCPU, 16 GB) in eu-west-2 plus 100 GB gp3 and a public IPv4 comes to about $165/month on-demand. Termination protection is on.
+m7i-flex.xlarge (4 vCPU, 16 GB) in eu-west-2 plus 250 GB gp3 and a public IPv4 comes to about $180/month on-demand. Termination protection is on.

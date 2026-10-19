@@ -4,34 +4,45 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FEMME sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400&family=VT323&display=swap">
 <style>
-  :root { --bg: #f6f5f2; --card: #fff; --ink: #1d1c1a; --muted: #6b6862; --line: #e3e0da; --accent: #2f5d50; --on-accent: #fff; --bad: #a33a2a; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #161615; --card: #201f1d; --ink: #eceae6; --muted: #9d9a94; --line: #34322f; --accent: #7fb8a4; --on-accent: #10201b; --bad: #e08a7a; }
-  }
+  /* Same Lisa-desktop look as index.html. */
+  :root { --desk: #F386A1; --paper: #FEFEFE; --panel: #E5E5E5; --ink: #1E1E1E; --muted: #5c5c5c; --hover: #D45BB6; --bad: #B42318;
+          --pixel: VT323, ui-monospace, monospace; color-scheme: light; }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink);
-         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; }
-  main { width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 28px 24px; }
-  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: .02em; }
-  p { color: var(--muted); margin: 0 0 20px; font-size: 14px; }
-  input, button { width: 100%; font: inherit; border-radius: 10px; padding: 12px 14px; }
-  input { border: 1px solid var(--line); background: var(--bg); color: var(--ink); margin-bottom: 12px; }
-  button { border: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; cursor: pointer; }
+  ::selection { background: var(--hover); color: var(--ink); }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; color: var(--ink);
+         font: 16px/1.5 "Schibsted Grotesk", system-ui, sans-serif; letter-spacing: .02em;
+         background: var(--desk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect x='2' y='2' width='1' height='1' fill='%231e1e1e'/%3E%3C/svg%3E"); }
+  main { width: 100%; max-width: 360px; background: var(--panel); border: 1.2px solid var(--ink); box-shadow: 3px 3px 0 rgba(0, 0, 0, .4); }
+  h1 { margin: 0; padding: 3px 8px; background: var(--ink); color: var(--paper); font: 22px/1 var(--pixel); letter-spacing: .01em; }
+  .pane { padding: 20px 16px; }
+  p { color: var(--muted); margin: 0 0 16px; font-size: 15px; }
+  input, button { width: 100%; font: inherit; border-radius: 0; border: 1.2px solid var(--ink); }
+  input { background: var(--paper); color: var(--ink); padding: 10px 12px; margin-bottom: 12px; }
+  ::placeholder { color: #767676; }
+  button { height: 44px; background: var(--ink); color: var(--paper); font: 22px/1 var(--pixel); cursor: pointer; transition: background-color .2s; }
+  button:hover { background: var(--hover); color: var(--ink); }
   button:disabled { opacity: .6; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .msg { margin-top: 14px; font-size: 14px; color: var(--muted); }
+  .msg:empty { display: none; }
   .msg.bad { color: var(--bad); }
 </style>
 </head>
 <body>
 <main>
   <h1>FEMME</h1>
-  <p id="lead">Enter your email for a sign-in link.</p>
-  <form id="f">
-    <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
-    <button id="go">Email me a link</button>
-  </form>
-  <div class="msg" id="msg" role="status"></div>
+  <div class="pane">
+    <p id="lead">Enter your email for a sign-in link.</p>
+    <form id="f">
+      <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      <button id="go">Email me a link</button>
+    </form>
+    <div class="msg" id="msg" role="status"></div>
+  </div>
 </main>
 <script>
   const $ = id => document.getElementById(id);

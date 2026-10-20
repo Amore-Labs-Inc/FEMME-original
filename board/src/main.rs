@@ -2,8 +2,10 @@
 //! Sign-in: a magic link to the one allowed address (BOARD_EMAIL), sent through Resend,
 //! then a 7-day cookie. Listens on localhost; Caddy in front adds TLS.
 //! The worker (worker.sh) uses the same API with the bearer token in <state>/worker.token.
-//! Claude accounts on the box are cswap's: the board lists, switches and adds them.
+//! Claude accounts on the box are cswap's: the board lists, switches and adds them. It also signs
+//! the box's AWS CLI in.
 
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
@@ -22,11 +24,12 @@ const PAGE: &str = include_str!("index.html");
 const LOGIN: &str = include_str!("login.html");
 const LOGO: &str = include_str!("logo.svg"); // also the favicon
 const MAX_BODY: u64 = 1 << 20;
+const MAX_UPLOAD: u64 = 20 << 20; // a pasted screenshot or file, before base64
+const UPLOAD_DAYS: u64 = 7;
 const SESSION_SECS: u64 = 7 * 86400;
 const LINK_SECS: u64 = 15 * 60;
 const STATUSES: &[&str] = &["open", "working", "waiting", "paused", "pr", "done", "failed"];
 // Keys the chat panel may press in an agent's terminal (answering Claude's choice prompts).
-const KEYS: &[&str] = &["enter", "esc", "up", "down", "tab", "1", "2", "3", "4"];
 const PATCHABLE: &[&str] = &["repo", "title", "body", "status", "pr_url", "note", "pane", "resume_at"];
 
 type Resp = Response<Cursor<Vec<u8>>>;
@@ -45,12 +48,15 @@ struct App {
     url: String,
     resend_key: String,
     from: String,
-    accounts: Arc<Mutex<Value>>, // last `cswap list --json`, refreshed in the background
-    login: Option<Login>,        // an account being added
+    accounts: Arc<Mutex<Value>>,   // account_status(), refreshed in the background
+    logins: HashMap<String, Login>, // sign-ins waiting for their code: "claude" or "aws"
 }
 
-/// A new account's `claude auth login`, run in its own config dir so the box's live login
-/// (and every agent on it) stays untouched; `cswap add` then stores it from there.
+/// A sign-in that needs a browser: the command prints a link, you sign in wherever you are, and
+/// the code the page then shows goes back to it on stdin.
+/// - claude: a new cswap account. It signs in under its own config dir, so the box's live login
+///   (and every agent on it) stays untouched; `cswap add` then stores it from there.
+/// - aws: the box's own AWS CLI (`aws login --remote`).
 struct Login {
     child: Child,
     dir: PathBuf,
@@ -58,19 +64,23 @@ struct Login {
 }
 
 impl Login {
-    fn start(dir: PathBuf) -> Result<Login, String> {
+    fn start(kind: &str, dir: PathBuf) -> Result<Login, String> {
         let _ = fs::remove_dir_all(&dir);
         fs::DirBuilder::new().mode(0o700).create(&dir).map_err(|e| e.to_string())?;
         let log = fs::File::create(dir.join("out")).map_err(|e| e.to_string())?;
-        let child = Command::new("claude")
-            .args(["auth", "login"])
-            .env("CLAUDE_CONFIG_DIR", &dir)
-            .env("BROWSER", "true") // nothing to open here: the link goes to the board
+        let mut cmd = Command::new(kind);
+        if kind == "claude" {
+            // BROWSER: nothing to open here, the link goes to the board.
+            cmd.args(["auth", "login"]).env("CLAUDE_CONFIG_DIR", &dir).env("BROWSER", "true");
+        } else {
+            cmd.args(["login", "--remote"]);
+        }
+        let child = cmd
             .stdin(Stdio::piped())
             .stdout(log.try_clone().map_err(|e| e.to_string())?)
             .stderr(log)
             .spawn()
-            .map_err(|e| format!("claude: {e}"))?;
+            .map_err(|e| format!("{kind}: {e}"))?;
         let mut login = Login { child, dir, started: now() };
         for _ in 0..75 {
             if login.url().is_some() {
@@ -81,7 +91,7 @@ impl Login {
             }
             thread::sleep(Duration::from_millis(200));
         }
-        Err(last_line(&login.output()).unwrap_or("claude printed no sign-in link").into())
+        Err(last_line(&login.output()).unwrap_or("no sign-in link came up").into())
     }
 
     fn output(&self) -> String {
@@ -92,18 +102,20 @@ impl Login {
         login_url(&self.output())
     }
 
-    /// Hands claude the code from claude.ai; once it has signed in, cswap adds the account.
+    /// Hands over the code the sign-in page showed and waits for the command to finish.
     fn finish(&mut self, code: &str) -> Result<(), String> {
         let stdin = self.child.stdin.as_mut().ok_or("the login has ended; start again")?;
         writeln!(stdin, "{code}").map_err(|e| e.to_string())?;
         for _ in 0..150 {
             if let Some(status) = self.child.try_wait().map_err(|e| e.to_string())? {
-                if !status.success() {
-                    let out = self.output();
-                    let why = last_line(&out).unwrap_or("login failed");
-                    return Err(why.trim_start_matches("Paste code here if prompted > ").into());
+                if status.success() {
+                    return Ok(());
                 }
-                return cswap(&["add"], Some(&self.dir)).map(drop);
+                // The error lands on the prompt's line, as the prompt ends without a newline.
+                let out = self.output();
+                let why = last_line(&out).unwrap_or("login failed");
+                let prompts = ["Paste code here if prompted > ", "Enter the authorization code displayed in your browser: "];
+                return Err(prompts.iter().fold(why, |w, p| w.trim_start_matches(p)).into());
             }
             thread::sleep(Duration::from_millis(200));
         }
@@ -141,18 +153,18 @@ fn main() {
         resend_key: var("RESEND_API_KEY"),
         from: var("MAIL_FROM"),
         accounts: Arc::new(Mutex::new(Value::Null)),
-        login: None,
+        logins: HashMap::new(),
     };
     assert!(!app.email.is_empty() && !app.url.is_empty(), "BOARD_EMAIL and BOARD_URL must be set");
     if app.resend_key.is_empty() {
         eprintln!("RESEND_API_KEY is not set: sign-in links are printed here instead of emailed");
     }
 
-    // cswap can take a few seconds when it fetches usage, so it never runs inside a page load.
+    // cswap and aws can take a few seconds (network), so they never run inside a page load.
     let cache = app.accounts.clone();
     thread::spawn(move || loop {
-        let list = cswap_list();
-        *cache.lock().unwrap() = list;
+        let status = account_status();
+        *cache.lock().unwrap() = status;
         thread::sleep(Duration::from_secs(30));
     });
 
@@ -296,45 +308,39 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
         (Method::Delete, ["api", "terminals", ws]) if valid_id(ws, false) => {
             herdr(&["workspace", "close", ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
         }
+        // The browser terminal: the pane's screen with its colours, and raw keystrokes back.
         (Method::Get, ["api", "terminals", pane, "screen"]) if valid_id(pane, true) => {
-            match herdr(&["pane", "read", pane, "--source", "recent-unwrapped", "--lines", "150"]) {
+            match herdr(&["pane", "read", pane, "--source", "visible", "--format", "ansi"]) {
                 Ok(screen) => ok(json!({"screen": screen, "status": pane_status(pane)})),
                 Err(e) => err(404, &e),
             }
         }
-        (Method::Post, ["api", "terminals", pane, "say"]) if valid_id(pane, true) => {
+        (Method::Post, ["api", "terminals", pane, "input"]) if valid_id(pane, true) => {
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
-            let text = input["text"].as_str().unwrap_or("").trim();
-            if text.is_empty() {
-                return err(400, "say something");
+            // An argument can't hold NUL, and must stay under the kernel's 128 KiB per-argument cap.
+            let data = input["data"].as_str().unwrap_or("").replace('\0', "");
+            if data.is_empty() || data.len() > 100_000 {
+                return err(400, "send 1 to 100000 bytes");
             }
-            // An agent gets a prompt; a plain shell gets the line as a command.
-            let sent = match pane_status(pane) {
-                Some(_) => herdr(&["agent", "prompt", pane, text]),
-                None => herdr(&["pane", "run", pane, text]),
-            };
-            match sent {
-                Ok(_) => ok(json!({"ok": true})),
-                Err(e) if e.contains("agent_blocked") => {
-                    err(409, "the agent is waiting on a choice: answer with the buttons (1, 2, Enter, Esc)")
-                }
-                Err(e) => err(502, &e),
+            // herdr takes the text verbatim, even when it starts with a dash, so no `--` (it would be typed).
+            herdr(&["pane", "send-text", pane, &data]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+        }
+        // A pasted or dropped file lands in <state>/uploads; the page then types its path into
+        // the terminal, which Claude Code turns into an attached image.
+        (Method::Post, ["api", "terminals", "upload"]) => {
+            let Ok(input) = read_json_up_to(req, MAX_UPLOAD / 3 * 4 + 4096) else { return err(413, "files up to 20 MB") };
+            let Ok(bytes) = BASE64.decode(input["data"].as_str().unwrap_or("")) else { return err(400, "data must be base64") };
+            let dir = app.meta.with_file_name("uploads");
+            match save_upload(&dir, input["name"].as_str().unwrap_or(""), &bytes) {
+                Ok(path) => ok(json!({"path": path})),
+                Err(e) => err(500, &format!("save failed: {e}")),
             }
         }
-        (Method::Post, ["api", "terminals", pane, "keys"]) if valid_id(pane, true) => {
-            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
-            let key = input["key"].as_str().unwrap_or("");
-            if !KEYS.contains(&key) {
-                return err(400, &format!("key must be one of {}", KEYS.join(", ")));
-            }
-            herdr(&["pane", "send-keys", pane, key]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
-        }
-        // Claude accounts (cswap): usage of each, switch the box to one, or add one. Adding is
-        // two steps: start a login and show its link, then take the code claude.ai gives you.
+        // Accounts: Claude's (cswap) with the usage of each, and the box's AWS CLI. Switch the box to
+        // another Claude account, or sign in: start a login and open its link, then hand over the
+        // code the sign-in page shows.
         (Method::Get, ["api", "accounts"]) => {
-            if app.login.as_ref().is_some_and(|l| now() > l.started + LINK_SECS) {
-                app.login = None; // its code would have expired by now
-            }
+            app.logins.retain(|_, l| now() <= l.started + LINK_SECS); // their codes would have expired
             ok(accounts(app))
         }
         (Method::Post, ["api", "accounts", "switch"]) => {
@@ -346,36 +352,39 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             if let Err(e) = cswap(&["switch", n, "--json"], None) {
                 return err(502, &e);
             }
-            *app.accounts.lock().unwrap() = cswap_list();
+            app.accounts.lock().unwrap()["cswap"] = cswap_list();
             ok(accounts(app))
         }
-        (Method::Post, ["api", "accounts", "login"]) => {
-            app.login = None; // ends an earlier attempt first
-            match Login::start(app.meta.with_file_name("login")) {
+        (Method::Post, ["api", "accounts", kind @ ("claude" | "aws"), "login"]) => {
+            app.logins.remove(*kind); // ends an earlier attempt first
+            match Login::start(kind, app.meta.with_file_name(format!("{kind}-login"))) {
                 Ok(login) => {
-                    app.login = Some(login);
+                    app.logins.insert(kind.to_string(), login);
                     ok(accounts(app))
                 }
                 Err(e) => err(502, &e),
             }
         }
-        (Method::Post, ["api", "accounts", "code"]) => {
+        (Method::Post, ["api", "accounts", kind @ ("claude" | "aws"), "code"]) => {
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
             let code = input["code"].as_str().unwrap_or("").trim();
             if code.is_empty() || code.len() > 1000 || code.chars().any(|c| c.is_whitespace() || c.is_control()) {
-                return err(400, "paste the code exactly as claude.ai shows it");
+                return err(400, "paste the code exactly as the sign-in page shows it");
             }
-            let Some(mut login) = app.login.take() else { return err(409, "that login ended; press + add again") };
-            let added = login.finish(code);
+            let Some(mut login) = app.logins.remove(*kind) else { return err(409, "that sign-in ended; start again") };
+            let mut done = login.finish(code);
+            if *kind == "claude" && done.is_ok() {
+                done = cswap(&["add"], Some(&login.dir)).map(drop);
+            }
             drop(login);
-            *app.accounts.lock().unwrap() = cswap_list();
-            match added {
+            *app.accounts.lock().unwrap() = account_status();
+            match done {
                 Ok(()) => ok(accounts(app)),
                 Err(e) => err(502, &e),
             }
         }
-        (Method::Delete, ["api", "accounts", "login"]) => {
-            app.login = None;
+        (Method::Delete, ["api", "accounts", kind, "login"]) => {
+            app.logins.remove(*kind);
             ok(accounts(app))
         }
         (Method::Delete, ["api", "issues", id]) => {
@@ -532,6 +541,28 @@ fn home_dir(home: &Path, dir: &str) -> Option<String> {
     (real.is_dir() && real.starts_with(fs::canonicalize(home).ok()?)).then(|| real.display().to_string())
 }
 
+/// Saves an upload under a random prefix and a cleaned name (the extension tells Claude it is an
+/// image), and drops uploads older than UPLOAD_DAYS on the way.
+fn save_upload(dir: &Path, name: &str, bytes: &[u8]) -> std::io::Result<String> {
+    fs::DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
+    let old = SystemTime::now() - Duration::from_secs(UPLOAD_DAYS * 86400);
+    for f in fs::read_dir(dir)?.flatten() {
+        if f.metadata().and_then(|m| m.modified()).is_ok_and(|t| t < old) {
+            let _ = fs::remove_file(f.path());
+        }
+    }
+    let path = dir.join(format!("{}-{}", &random_hex()[..8], clean_name(name)));
+    fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&path)?.write_all(bytes)?;
+    Ok(path.display().to_string())
+}
+
+fn clean_name(name: &str) -> String {
+    let name: String = name.chars().filter(|c| c.is_ascii_alphanumeric() || "._-".contains(*c)).collect();
+    let name = name.trim_start_matches('.');
+    // ASCII only by now, so slicing bytes is safe; the end is kept for the extension.
+    if name.is_empty() { "paste".into() } else { name[name.len().saturating_sub(60)..].to_string() }
+}
+
 fn herdr(args: &[&str]) -> Result<String, String> {
     let out = std::process::Command::new("herdr").args(args).output().map_err(|e| format!("herdr: {e}"))?;
     if out.status.success() {
@@ -564,15 +595,31 @@ fn cswap_list() -> Value {
         .unwrap_or_else(|e| json!({"error": e}))
 }
 
-fn accounts(app: &App) -> Value {
-    let login = app.login.as_ref().and_then(Login::url).map(|url| json!({"url": url}));
-    json!({"cswap": app.accounts.lock().unwrap().clone(), "login": login})
+/// The accounts window: cswap's list, and who the AWS CLI is signed in as.
+fn account_status() -> Value {
+    let aws = Command::new("aws")
+        .args(["sts", "get-caller-identity", "--output", "json", "--cli-connect-timeout", "5", "--cli-read-timeout", "5"])
+        .env("AWS_PAGER", "")
+        .stdin(Stdio::null())
+        .output();
+    let aws = match aws {
+        Ok(o) if o.status.success() => serde_json::from_slice(&o.stdout).unwrap_or_default(),
+        Ok(o) => json!({"error": last_line(&String::from_utf8_lossy(&o.stderr)).unwrap_or("not signed in")}),
+        Err(e) => json!({"error": format!("aws: {e}")}),
+    };
+    json!({"cswap": cswap_list(), "aws": aws})
 }
 
-/// The sign-in link in `claude auth login`'s output, which may wrap it in a terminal hyperlink.
+fn accounts(app: &App) -> Value {
+    let mut v = app.accounts.lock().unwrap().clone();
+    v["login"] = app.logins.iter().filter_map(|(k, l)| Some((k.clone(), Value::from(l.url()?)))).collect();
+    v
+}
+
+/// The sign-in link in a login command's output, which may wrap it in a terminal hyperlink.
 fn login_url(out: &str) -> Option<String> {
     let url: String = out[out.find("https://")?..].chars().take_while(|c| !c.is_whitespace() && !c.is_control()).collect();
-    url.contains("/oauth/authorize?").then_some(url)
+    url.contains("/authorize?").then_some(url)
 }
 
 fn last_line(s: &str) -> Option<&str> {
@@ -632,8 +679,12 @@ fn random_hex() -> String {
 }
 
 fn read_json(req: &mut Request) -> Result<Value, String> {
+    read_json_up_to(req, MAX_BODY)
+}
+
+fn read_json_up_to(req: &mut Request, limit: u64) -> Result<Value, String> {
     let mut s = String::new();
-    req.as_reader().take(MAX_BODY).read_to_string(&mut s).map_err(|e| e.to_string())?;
+    req.as_reader().take(limit).read_to_string(&mut s).map_err(|e| e.to_string())?;
     serde_json::from_str(&s).map_err(|e| format!("invalid JSON: {e}"))
 }
 
@@ -712,8 +763,19 @@ mod tests {
         assert_eq!(login_url(&plain).as_deref(), Some(url));
         let osc8 = format!("visit: \x1b]8;;{url}\x07{url}\x1b]8;;\x07\n");
         assert_eq!(login_url(&osc8).as_deref(), Some(url));
+        let aws = "https://eu-west-2.signin.aws.amazon.com/v1/authorize?response_type=code&client_id=x";
+        assert_eq!(login_url(&format!("Please visit the following URL:\n\n{aws}\n\nEnter the authorization code")).as_deref(), Some(aws));
         assert_eq!(login_url("visit: https://example.com/elsewhere"), None);
         assert_eq!(login_url("Paste code here if prompted > "), None);
+    }
+
+    #[test]
+    fn upload_names_stay_plain() {
+        assert_eq!(clean_name("Screenshot 2026-10-20 at 10.01.png"), "Screenshot2026-10-20at10.01.png");
+        assert_eq!(clean_name("../../.ssh/id rsa"), "sshidrsa"); // no slashes, no leading dot
+        assert_eq!(clean_name(""), "paste");
+        assert_eq!(clean_name(&format!("{}.png", "a".repeat(100))).len(), 60);
+        assert!(clean_name(&format!("{}.png", "a".repeat(100))).ends_with(".png"));
     }
 
     #[test]

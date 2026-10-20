@@ -35,7 +35,8 @@ units="herdr-server herdr-notify"
 if [ -n "${BOARD_URL:-}" ]; then
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).
   command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }
-  printf '%s {\n\treverse_proxy 127.0.0.1:8787\n}\n' "${BOARD_URL#https://}" | sudo tee /etc/caddy/Caddyfile >/dev/null
+  # encode: the browser terminal polls the screen several times a second; compressed it is ~5x smaller.
+  printf '%s {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:8787\n}\n' "${BOARD_URL#https://}" | sudo tee /etc/caddy/Caddyfile >/dev/null
   sudo systemctl reload-or-restart caddy
   # Built here, not on the laptop, so a merge to main can deploy itself (deploy.sh).
   [ -x ~/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --no-modify-path
@@ -49,6 +50,9 @@ if [ -n "${BOARD_URL:-}" ]; then
   ln -sf ~/.local/share/cswap/bin/cswap ~/.local/bin/cswap
   # The box's own login becomes account 1 (fails harmlessly before the first /login).
   cswap list --json | jq -e '.accounts | length > 0' >/dev/null || cswap add || echo "WARN: cswap add failed; log in with claude, then rerun" >&2
+  # AWS CLI v2 for the board's AWS sign-in (`aws login --remote`). User-local, no sudo.
+  aws --version >/dev/null 2>&1 || { t=$(mktemp -d) && curl -fsSL -o "$t/aws.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" \
+    && unzip -q "$t/aws.zip" -d "$t" && "$t/aws/install" -i ~/.local/share/aws-cli -b ~/.local/bin --update >/dev/null && rm -rf "$t"; }
   units="$units femme-board femme-worker femme-cswap"
 fi
 

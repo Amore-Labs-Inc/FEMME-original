@@ -68,8 +68,8 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 - Sign in with a magic link sent to `BOARD_EMAIL` (once, 15 minutes); the cookie lasts 7 days.
 - Add an issue: pick a repo, describe the work. The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
-- **Chat** on a card opens that agent's live screen: reply, press 1/2/3/Enter/Esc, or end it.
-- **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, chat with it the same way, or close it.
+- **Chat** on a card opens that agent's terminal: a real terminal (xterm.js) showing the pane's live screen in colour. Type straight into it (keys, arrows, Ctrl-C, paste); on a phone the key bar has Esc, Tab, arrows, Ctrl-C and Enter. Paste or drop an image or file (or use the upload button): it is saved to `~/.local/state/femme/uploads` (kept 7 days) and its path is typed in, which Claude Code attaches as an image. **End** closes the workspace.
+- **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, use it the same way, or close it.
 - Merging to `main` deploys itself: every 20 seconds `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Set both in `.env`.
 
@@ -81,6 +81,7 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 - Click an account to switch the VPS to it (`cswap switch`).
 - `femme-cswap.service` runs `cswap auto --threshold $CAP`: when the active account passes `CAP` it switches to the account with the most left, so agents only pause once every account is past `CAP` (keep it 50-99).
 - `bootstrap.sh` installs cswap and saves the VPS's current login as account 1.
+- **AWS**: the window also shows who the VPS's AWS CLI is signed in as. **sign in** opens the AWS sign-in page; paste the code it shows into the board, which finishes `aws login --remote` for you. `bootstrap.sh` installs the AWS CLI.
 
 ## Files
 

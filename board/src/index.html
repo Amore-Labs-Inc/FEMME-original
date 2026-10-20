@@ -25,7 +25,7 @@
   .tb { display: flex; align-items: center; gap: 8px; margin: 0; padding: 3px 8px; background: var(--ink); color: var(--desk);
         font: 22px/1 var(--pixel); font-weight: normal; letter-spacing: .01em; text-transform: lowercase; }
   .tb b { width: 10px; height: 10px; flex: none; }
-  .frame { display: grid; gap: 3px; padding: 3px; }
+  .frame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 3px; }
   .card { background: var(--paper); border: 1.2px solid var(--ink); padding: 10px 12px; }
   .dialog { background: var(--panel); box-shadow: 3px 3px 0 rgba(0, 0, 0, .4); }
   .dialog .tb { color: var(--paper); }
@@ -42,7 +42,7 @@
   button:hover { background: var(--hover); }
   button.dark { background: var(--ink); color: var(--paper); }
   button.dark:hover { background: var(--hover); color: var(--ink); }
-  .form button { height: 42px; font-size: 22px; }
+  .form > button { height: 42px; font-size: 22px; }
   :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .meta { font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
   .title { font-size: 17px; font-weight: 500; margin: 4px 0 2px; overflow-wrap: anywhere; }
@@ -60,12 +60,35 @@
   .win[open] > summary .tb::after { content: "[-]"; }
   .err { color: var(--bad); font-size: 14px; }
   .err:empty { display: none; }
+  .hidden { display: none !important; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  .tabs button { flex: 1; height: 42px; font-size: 22px; }
+  .tabs button.on { background: var(--ink); color: var(--paper); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select { font: inherit; border-radius: 0; border: 1.2px solid var(--ink); background: var(--paper); color: var(--ink); padding: 9px 10px; }
+  .term { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .term .grow { flex: 1; min-width: 0; }
+  .term .cwd { font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 10px; height: 10px; border: 1.2px solid var(--ink); background: var(--paper); flex: none; }
+  .dot.working { background: var(--work); } .dot.blocked, .dot.done { background: var(--pause); } .dot.idle { background: var(--done); }
+  .st { font: 18px/1 var(--pixel); letter-spacing: .01em; padding: 1px 6px; border: 1.2px solid currentColor; }
+  #chat { position: fixed; inset: 0; background: inherit; display: none; flex-direction: column; z-index: 10; }
+  #chat.open { display: flex; }
+  #chat .top { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: var(--ink); color: var(--desk); font: 22px/1 var(--pixel); }
+  #chat .top b { flex: 1; font-weight: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #chat .top button { height: 30px; }
+  #screen { flex: 1; margin: 6px 6px 0; padding: 10px 12px; overflow: auto; font: 12px/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+            background: var(--ink); color: var(--panel); }
+  #say { margin: 6px; padding: 10px; background: var(--paper); border: 1.2px solid var(--ink); }
+  #say textarea { min-height: 52px; }
+  .keys { display: flex; gap: 6px; flex-wrap: wrap; }
+  .keys button { min-width: 44px; }
 </style>
 </head>
 <body>
 <header class="nav">
   <div class="wrap">
-    <h1>FEMME<small>issues board</small></h1>
+    <h1>FEMME<small>board</small></h1>
     <button id="out" class="dark">Sign out</button>
   </div>
 </header>
@@ -75,25 +98,66 @@
     <div id="usage">waiting for worker</div>
   </section>
 
-  <form id="new" class="win">
-    <h2 class="tb">new issue</h2>
-    <div class="frame">
-      <div class="card form">
-        <input id="repo" list="repos" placeholder="owner/repo" required autocapitalize="off" autocorrect="off" spellcheck="false">
-        <datalist id="repos"></datalist>
-        <input id="title" placeholder="What should be done?" required>
-        <textarea id="body" placeholder="Details, acceptance criteria, files to look at (optional)"></textarea>
-        <button class="dark">Add to queue</button>
-        <div class="err" id="err" role="alert"></div>
-      </div>
-    </div>
-  </form>
+  <div class="tabs"><button id="tab-terms">Terminals</button><button id="tab-issues">Issues</button></div>
 
-  <div id="board"></div>
+  <section id="v-terms" class="hidden">
+    <form id="newterm" class="win">
+      <h2 class="tb">new terminal</h2>
+      <div class="frame">
+        <div class="card form">
+          <input id="folder" list="folders" placeholder="Folder (empty = home)" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <datalist id="folders"></datalist>
+          <div class="row">
+            <select id="agent"><option value="claude">Claude</option><option value="codex">Codex</option><option value="pi">Pi</option><option value="">Shell</option></select>
+            <input id="tlabel" placeholder="Name (optional)" style="flex:1;min-width:120px">
+          </div>
+          <button class="dark">Open terminal</button>
+          <div class="err" id="terr" role="alert"></div>
+        </div>
+      </div>
+    </form>
+    <section class="win">
+      <h2 class="tb">terminals</h2>
+      <div class="frame" id="terms"></div>
+    </section>
+  </section>
+
+  <section id="v-issues" class="hidden">
+    <form id="new" class="win">
+      <h2 class="tb">new issue</h2>
+      <div class="frame">
+        <div class="card form">
+          <input id="repo" list="repos" placeholder="owner/repo" required autocapitalize="off" autocorrect="off" spellcheck="false">
+          <datalist id="repos"></datalist>
+          <input id="title" placeholder="What should be done?" required>
+          <textarea id="body" placeholder="Details, acceptance criteria, files to look at (optional)"></textarea>
+          <button class="dark">Add to queue</button>
+          <div class="err" id="err" role="alert"></div>
+        </div>
+      </div>
+    </form>
+
+    <div id="board"></div>
+  </section>
 </main>
+
+<div id="chat" role="dialog" aria-label="Chat with the agent">
+  <div class="top"><b id="chat-title"></b><span class="st" id="chat-st"></span><button id="chat-kill">End</button><button id="chat-close">Back</button></div>
+  <pre id="screen"></pre>
+  <form id="say" class="form">
+    <div class="keys">
+      <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
+      <button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button>
+      <button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button>
+    </div>
+    <textarea id="msg" placeholder="Message the agent"></textarea>
+    <button class="dark">Send</button>
+    <div class="err" id="chat-err" role="alert"></div>
+  </form>
+</div>
 <script>
   const SECTIONS = [
-    ['working', 'Working', '--work'], ['paused', 'Paused', '--pause'], ['open', 'Queue', '--queue'],
+    ['waiting', 'Needs you', '--pause'], ['working', 'Working', '--work'], ['paused', 'Paused', '--queue'], ['open', 'Queue', '--queue'],
     ['pr', 'PR ready', '--pr'], ['failed', 'Failed', '--bad'], ['done', 'Done', '--done'],
   ];
   const $ = id => document.getElementById(id);
@@ -108,9 +172,10 @@
 
   function card(i) {
     const acts = [];
+    if (i.pane && ['working', 'waiting', 'paused', 'pr', 'failed'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-pane="${esc(i.pane)}" data-chat="${esc(i.title)}">Chat</button>`);
     if (['paused', 'failed', 'done'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-set="open">Retry</button>`);
     if (i.status === 'pr') acts.push(`<button data-id="${i.id}" data-set="done">Merged, done</button>`);
-    if (i.status !== 'working') acts.push(`<button data-id="${i.id}" data-del>Delete</button>`);
+    if (!['working', 'waiting'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-del>Delete</button>`);
     return `<div class="card">
       <div class="meta"><span>#${i.id}</span><span>${esc(i.repo)}</span><span>${ago(i.updated || i.created)}</span></div>
       <div class="title">${esc(i.title)}</div>
@@ -150,6 +215,7 @@
   $('board').onclick = async e => {
     const b = e.target.closest('button');
     if (!b) return;
+    if (b.dataset.chat !== undefined) return openChat(b.dataset.pane, `#${b.dataset.id} ${b.dataset.chat}`);
     if (b.dataset.del !== undefined) {
       if (!confirm('Delete this issue?')) return;
       await api(`/api/issues/${b.dataset.id}`, { method: 'DELETE' });
@@ -160,6 +226,94 @@
   };
 
   $('out').onclick = async () => { await api('/api/logout', { method: 'POST', body: '{}' }); location.replace('/login'); };
+
+  // Chat: a live view of a terminal on the box plus a message box, refreshed every 3s while open.
+  // Agents get your text as a prompt; plain shells get it as a command line.
+  let chatPane = null, chatWs = null, chatTimer = null;
+  async function pullScreen() {
+    const r = await api(`/api/terminals/${chatPane}/screen`);
+    const d = await r.json();
+    if (!r.ok) { $('chat-st').textContent = 'gone'; $('screen').textContent = d.error; return; }
+    const sc = $('screen'), atBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight < 40;
+    $('chat-st').textContent = d.status || 'shell';
+    sc.textContent = d.screen.replace(/\s+$/, '');
+    if (atBottom) sc.scrollTop = sc.scrollHeight;
+  }
+  function openChat(pane, title) {
+    chatPane = pane;
+    chatWs = pane.split(':')[0];
+    $('chat-title').textContent = title;
+    $('screen').textContent = 'loading…';
+    $('chat-err').textContent = '';
+    $('chat').classList.add('open');
+    pullScreen().then(() => $('screen').scrollTop = $('screen').scrollHeight);
+    chatTimer = setInterval(pullScreen, 3000);
+  }
+  function closeChat() { $('chat').classList.remove('open'); clearInterval(chatTimer); chatPane = null; refresh(); refreshTerms(); }
+  $('chat-close').onclick = closeChat;
+  $('chat-kill').onclick = async () => {
+    if (!confirm('End this terminal? Whatever runs in it stops.')) return;
+    await api(`/api/terminals/${chatWs}`, { method: 'DELETE' });
+    closeChat();
+  };
+  $('say').onsubmit = async e => {
+    e.preventDefault();
+    const text = $('msg').value.trim();
+    if (!text) return;
+    $('chat-err').textContent = '';
+    const r = await api(`/api/terminals/${chatPane}/say`, { method: 'POST', body: JSON.stringify({ text }) });
+    if (!r.ok) return $('chat-err').textContent = (await r.json()).error;
+    $('msg').value = '';
+    setTimeout(pullScreen, 800);
+  };
+  $('say').onclick = async e => {
+    const k = e.target.closest('button[data-key]');
+    if (!k) return;
+    const r = await api(`/api/terminals/${chatPane}/keys`, { method: 'POST', body: JSON.stringify({ key: k.dataset.key }) });
+    if (!r.ok) $('chat-err').textContent = (await r.json()).error;
+    setTimeout(pullScreen, 500);
+  };
+
+  // Terminals tab: every herdr workspace on the box.
+  async function refreshTerms() {
+    const r = await api('/api/terminals');
+    if (!r.ok) return $('terms').innerHTML = `<div class="err">${esc((await r.json()).error)}</div>`;
+    const d = await r.json();
+    $('folders').innerHTML = d.folders.map(f => `<option value="${esc(f)}">`).join('');
+    $('terms').innerHTML = d.workspaces.length ? d.workspaces.map(w => w.panes.map(p => `
+      <div class="card term" data-pane="${esc(p.pane_id)}" data-title="${esc(w.label + (p.title ? ' · ' + p.title : ''))}">
+        <span class="dot ${esc(p.status || '')}"></span>
+        <div class="grow"><div class="title">${esc(w.label)}${w.panes.length > 1 ? ` <span class="st">${esc(p.pane_id)}</span>` : ''}</div>
+          <div class="cwd">${esc(p.agent || 'shell')}${p.status && p.status !== 'unknown' ? ' · ' + esc(p.status) : ''}${p.title ? ' · ' + esc(p.title) : ''}</div>
+          <div class="cwd">${esc(p.cwd || '')}</div></div>
+      </div>`).join('')).join('') : '<div class="empty">no terminals</div>';
+  }
+  $('terms').onclick = e => { const c = e.target.closest('.term'); if (c) openChat(c.dataset.pane, c.dataset.title); };
+  $('newterm').onsubmit = async e => {
+    e.preventDefault();
+    $('terr').textContent = '';
+    const r = await api('/api/terminals', { method: 'POST', body: JSON.stringify({ cwd: $('folder').value, agent: $('agent').value, label: $('tlabel').value }) });
+    const d = await r.json();
+    if (!r.ok) return $('terr').textContent = d.error;
+    $('tlabel').value = '';
+    await refreshTerms();
+    openChat(d.pane_id, $('folder').value.split('/').pop() || 'home');
+  };
+
+  function show(tab) {
+    $('v-terms').classList.toggle('hidden', tab !== 'terms');
+    $('v-issues').classList.toggle('hidden', tab !== 'issues');
+    $('tab-terms').classList.toggle('on', tab === 'terms');
+    $('tab-issues').classList.toggle('on', tab === 'issues');
+    try { localStorage.setItem('femme-tab', tab); } catch {}
+  }
+  $('tab-terms').onclick = () => { show('terms'); refreshTerms(); };
+  $('tab-issues').onclick = () => { show('issues'); refresh(); };
+  let saved = 'terms';
+  try { saved = localStorage.getItem('femme-tab') || 'terms'; } catch {}
+  show(saved);
+  refreshTerms();
+  setInterval(() => { if (!chatPane && !$('v-terms').classList.contains('hidden')) refreshTerms(); }, 10000);
 
   refresh();
   setInterval(refresh, 10000);

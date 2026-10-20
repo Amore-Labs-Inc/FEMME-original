@@ -19,7 +19,9 @@ const LOGIN: &str = include_str!("login.html");
 const MAX_BODY: u64 = 1 << 20;
 const SESSION_SECS: u64 = 7 * 86400;
 const LINK_SECS: u64 = 15 * 60;
-const STATUSES: &[&str] = &["open", "working", "paused", "pr", "done", "failed"];
+const STATUSES: &[&str] = &["open", "working", "waiting", "paused", "pr", "done", "failed"];
+// Keys the chat panel may press in an agent's terminal (answering Claude's choice prompts).
+const KEYS: &[&str] = &["enter", "esc", "up", "down", "tab", "1", "2", "3", "4"];
 const PATCHABLE: &[&str] = &["repo", "title", "body", "status", "pr_url", "note", "pane", "resume_at"];
 
 type Resp = Response<Cursor<Vec<u8>>>;
@@ -33,6 +35,7 @@ struct App {
     db: PathBuf,
     sessions_path: PathBuf,
     meta: PathBuf,
+    home: PathBuf,
     email: String,
     url: String,
     resend_key: String,
@@ -55,6 +58,7 @@ fn main() {
         db: dir.join("issues.json"),
         sessions_path: dir.join("sessions.json"),
         meta: dir.join("meta.json"),
+        home: PathBuf::from(var("HOME")),
         email: var("BOARD_EMAIL").trim().to_lowercase(),
         url: var("BOARD_URL").trim_end_matches('/').into(),
         resend_key: var("RESEND_API_KEY"),
@@ -164,6 +168,71 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             *issue = updated.clone();
             save_issues(app).unwrap_or_else(|| ok(updated))
         }
+        // Terminals on this box (herdr workspaces): list, open, close, read, type into.
+        // Issue chat uses the same routes through the issue's pane. herdr runs as this same
+        // user; arguments go straight to it, never through a shell.
+        (Method::Get, ["api", "terminals"]) => match herdr(&["api", "snapshot"]) {
+            Ok(out) => ok(terminals(&out, &app.home)),
+            Err(e) => err(502, &e),
+        },
+        (Method::Post, ["api", "terminals"]) => {
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let Some(cwd) = home_dir(&app.home, input["cwd"].as_str().unwrap_or("")) else {
+                return err(400, "folder must exist inside your home directory")
+            };
+            let label = input["label"].as_str().unwrap_or("").trim().chars().take(60).collect::<String>();
+            let mut args = vec!["workspace", "create", "--cwd", &cwd, "--no-focus"];
+            if !label.is_empty() {
+                args.extend(["--label", &label]);
+            }
+            let pane = match herdr(&args).ok().and_then(|o| serde_json::from_str::<Value>(&o).ok()) {
+                Some(v) => text(&v["result"]["root_pane"], "pane_id").to_string(),
+                None => return err(502, "herdr could not open a workspace"),
+            };
+            if let Some(kind) = input["agent"].as_str().filter(|k| ["claude", "codex", "pi"].contains(k)) {
+                wait_for_shell(&pane);
+                let name = format!("t-{}", &random_hex()[..8]);
+                let _ = herdr(&["agent", "start", &name, "--kind", kind, "--pane", &pane, "--timeout", "60000"]);
+                let _ = herdr(&["agent", "rename", &pane, "--clear"]);
+            }
+            ok(json!({"pane_id": pane}))
+        }
+        (Method::Delete, ["api", "terminals", ws]) if valid_id(ws, false) => {
+            herdr(&["workspace", "close", ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+        }
+        (Method::Get, ["api", "terminals", pane, "screen"]) if valid_id(pane, true) => {
+            match herdr(&["pane", "read", pane, "--source", "recent-unwrapped", "--lines", "150"]) {
+                Ok(screen) => ok(json!({"screen": screen, "status": pane_status(pane)})),
+                Err(e) => err(404, &e),
+            }
+        }
+        (Method::Post, ["api", "terminals", pane, "say"]) if valid_id(pane, true) => {
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let text = input["text"].as_str().unwrap_or("").trim();
+            if text.is_empty() {
+                return err(400, "say something");
+            }
+            // An agent gets a prompt; a plain shell gets the line as a command.
+            let sent = match pane_status(pane) {
+                Some(_) => herdr(&["agent", "prompt", pane, text]),
+                None => herdr(&["pane", "run", pane, text]),
+            };
+            match sent {
+                Ok(_) => ok(json!({"ok": true})),
+                Err(e) if e.contains("agent_blocked") => {
+                    err(409, "the agent is waiting on a choice: answer with the buttons (1, 2, Enter, Esc)")
+                }
+                Err(e) => err(502, &e),
+            }
+        }
+        (Method::Post, ["api", "terminals", pane, "keys"]) if valid_id(pane, true) => {
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let key = input["key"].as_str().unwrap_or("");
+            if !KEYS.contains(&key) {
+                return err(400, &format!("key must be one of {}", KEYS.join(", ")));
+            }
+            herdr(&["pane", "send-keys", pane, key]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+        }
         (Method::Delete, ["api", "issues", id]) => {
             let before = app.issues.len();
             app.issues.retain(|i| !id_matches(i, id));
@@ -239,6 +308,92 @@ fn apply(issue: &mut Value, input: &Value) -> Result<(), String> {
     }
     issue["updated"] = now().into();
     Ok(())
+}
+
+/// herdr ids: workspaces look like `w9`, panes like `w9:p1`. Anything else never reaches herdr.
+fn valid_id(id: &str, pane: bool) -> bool {
+    let word = |w: &str| w.len() > 1 && w.len() < 16 && w.chars().all(|c| c.is_ascii_alphanumeric());
+    match id.split_once(':') {
+        Some((ws, p)) => pane && ws.starts_with('w') && word(ws) && p.starts_with('p') && word(p),
+        None => !pane && id.starts_with('w') && word(id),
+    }
+}
+
+/// The agent status of a pane, or None if it is a plain shell.
+fn pane_status(pane: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(&herdr(&["agent", "get", pane]).ok()?).ok()?;
+    v["result"]["agent"]["agent_status"].as_str().map(String::from)
+}
+
+fn wait_for_shell(pane: &str) {
+    for _ in 0..30 {
+        let ready = herdr(&["pane", "process-info", "--pane", pane])
+            .ok()
+            .and_then(|o| serde_json::from_str::<Value>(&o).ok())
+            .is_some_and(|v| v["result"]["process_info"]["foreground_processes"].as_array().is_some_and(|a| a.len() == 1));
+        if ready {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+}
+
+/// Workspaces with their panes, plus folders you can open a new terminal in.
+fn terminals(snapshot: &str, home: &Path) -> Value {
+    let snap: Value = serde_json::from_str(snapshot).unwrap_or_default();
+    let snap = &snap["result"]["snapshot"];
+    let panes = snap["panes"].as_array().cloned().unwrap_or_default();
+    let workspaces: Vec<Value> = snap["workspaces"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|w| {
+            let id = text(&w, "workspace_id").to_string();
+            let ps: Vec<Value> = panes
+                .iter()
+                .filter(|p| text(p, "workspace_id") == id)
+                .map(|p| {
+                    json!({"pane_id": p["pane_id"], "agent": p["agent"], "status": p["agent_status"],
+                           "cwd": p["foreground_cwd"].as_str().or(p["cwd"].as_str()), "title": p["terminal_title_stripped"]})
+                })
+                .collect();
+            json!({"workspace_id": id, "label": w["label"], "status": w["agent_status"], "panes": ps})
+        })
+        .collect();
+    let mut folders = vec![home.display().to_string()];
+    for base in ["Documents", "femme-work"] {
+        for d in fs::read_dir(home.join(base)).into_iter().flatten().flatten() {
+            if d.path().is_dir() {
+                folders.push(d.path().display().to_string());
+                if base == "Documents" {
+                    for sub in fs::read_dir(d.path()).into_iter().flatten().flatten() {
+                        if sub.path().is_dir() && !sub.file_name().to_string_lossy().starts_with('.') {
+                            folders.push(sub.path().display().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    folders.sort();
+    json!({"workspaces": workspaces, "folders": folders})
+}
+
+/// An existing directory inside home, resolved (no `..` escapes, no symlinks out).
+fn home_dir(home: &Path, dir: &str) -> Option<String> {
+    let dir = if dir.trim().is_empty() { home.to_path_buf() } else { PathBuf::from(dir.trim()) };
+    let real = fs::canonicalize(dir).ok()?;
+    (real.is_dir() && real.starts_with(fs::canonicalize(home).ok()?)).then(|| real.display().to_string())
+}
+
+fn herdr(args: &[&str]) -> Result<String, String> {
+    let out = std::process::Command::new("herdr").args(args).output().map_err(|e| format!("herdr: {e}"))?;
+    if out.status.success() {
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
 }
 
 fn valid_repo(s: &str) -> bool {
@@ -342,6 +497,29 @@ mod tests {
         for bad in ["", "x", "a/b/c", "../x", "a/..", "a/.git", "a b/c", "a/$(rm)", "a/b;c", "-o/x", "a/--upload-pack"] {
             assert!(!valid_repo(bad), "{bad} should be rejected");
         }
+    }
+
+    #[test]
+    fn herdr_ids_are_strict() {
+        assert!(valid_id("w9", false) && valid_id("wC", false) && valid_id("w9:p1", true) && valid_id("wA:p12", true));
+        for bad in ["", "w", "9", "w9;ls", "w9 p1", "w9:p1", "../w9", "-w9", "w9:x1"] {
+            assert!(!valid_id(bad, false), "{bad} is not a workspace");
+        }
+        for bad in ["w9", "w9:", ":p1", "w9:p1;rm", "w9:p1:p2", "w9:p", "x9:p1"] {
+            assert!(!valid_id(bad, true), "{bad} is not a pane");
+        }
+    }
+
+    #[test]
+    fn home_dir_stays_inside_home() {
+        let home = env::temp_dir().join(format!("femme-home-{}", std::process::id()));
+        fs::create_dir_all(home.join("proj")).unwrap();
+        assert!(home_dir(&home, "").is_some());
+        assert!(home_dir(&home, home.join("proj").to_str().unwrap()).is_some());
+        assert!(home_dir(&home, home.join("proj/../..").to_str().unwrap()).is_none());
+        assert!(home_dir(&home, "/etc").is_none());
+        assert!(home_dir(&home, home.join("missing").to_str().unwrap()).is_none());
+        fs::remove_dir_all(&home).unwrap();
     }
 
     #[test]

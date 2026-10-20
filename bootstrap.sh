@@ -37,11 +37,19 @@ if [ -n "${BOARD_URL:-}" ]; then
   command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }
   printf '%s {\n\treverse_proxy 127.0.0.1:8787\n}\n' "${BOARD_URL#https://}" | sudo tee /etc/caddy/Caddyfile >/dev/null
   sudo systemctl reload-or-restart caddy
+  # Built here, not on the laptop, so a merge to main can deploy itself (deploy.sh).
+  [ -x ~/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --no-modify-path
+  ~/.cargo/bin/cargo build -q --release --manifest-path board/Cargo.toml
+  # Copy then rename: the running binary can't be written over.
+  cp board/target/release/femme-board ~/.local/bin/femme-board.new
+  mv ~/.local/bin/femme-board.new ~/.local/bin/femme-board
   units="$units femme-board femme-worker"
 fi
 
 mkdir -p ~/.config/systemd/user
 for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
+# Only the timer is started here: deploy.sh runs this script, and starting its own service would wait on itself.
+[ -z "${BOARD_URL:-}" ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
 systemctl --user daemon-reload
 systemctl --user enable --now $units
 systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker}

@@ -143,7 +143,15 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
         }
         (Method::Get, ["api", "issues"]) => ok(Value::from(app.issues.clone())),
         (Method::Get, ["api", "meta"]) => {
-            ok(fs::read_to_string(&app.meta).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or(json!({})))
+            let read = |p: &Path| fs::read_to_string(p).ok().and_then(|s| serde_json::from_str::<Value>(&s).ok());
+            let mut meta = read(&app.meta).filter(Value::is_object).unwrap_or(json!({}));
+            // deploy.sh's last result, shown until closed.
+            meta["deploy"] = read(&app.meta.with_file_name("deploy.json")).unwrap_or(Value::Null);
+            ok(meta)
+        }
+        (Method::Delete, ["api", "deploy"]) => {
+            let _ = fs::remove_file(app.meta.with_file_name("deploy.json"));
+            ok(json!({"ok": true}))
         }
         (Method::Post, ["api", "issues"]) => {
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };

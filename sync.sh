@@ -7,11 +7,7 @@ cd "$(dirname "$0")"
 . ./.env
 r() { rsync -az --mkpath "$@"; }
 
-r --delete --exclude=board/target ./ "$HOST:femme/"
-if [ -n "${BOARD_URL:-}" ]; then  # built here: the binary needs glibc 2.34, the VPS has 2.39
-  cargo build -q --release --manifest-path board/Cargo.toml
-  r board/target/release/femme-board "$HOST:.local/bin/"
-fi
+r --delete --exclude=board/target ./ "$HOST:femme/"  # bootstrap.sh builds the board there
 
 cd ~
 r -R --ignore-missing-args \

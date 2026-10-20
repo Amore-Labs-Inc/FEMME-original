@@ -30,6 +30,8 @@
   .dialog { background: var(--panel); box-shadow: 3px 3px 0 rgba(0, 0, 0, .4); }
   .dialog .tb { color: var(--paper); }
   #usage { padding: 8px; font: 20px/1.1 var(--pixel); }
+  .tb button { margin-left: auto; height: 22px; padding: 0 6px; font-size: 18px; background: transparent; color: inherit; border-color: currentColor; }
+  #deploy-msg { padding: 8px; font: 13px/1.4 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
   .meter { height: 20px; border: 1.2px solid var(--ink); background: var(--paper); margin-top: 6px; }
   .meter i { display: block; height: 100%; background: var(--ink); }
   .form { display: grid; gap: 10px; }
@@ -93,6 +95,10 @@
   </div>
 </header>
 <main class="wrap">
+  <section class="win dialog hidden" id="deploy">
+    <h2 class="tb"><b id="deploy-dot"></b>deploy<button id="deploy-x" aria-label="Close">x</button></h2>
+    <div id="deploy-msg"></div>
+  </section>
   <section class="win dialog">
     <h2 class="tb">usage</h2>
     <div id="usage">waiting for worker</div>
@@ -201,7 +207,14 @@
         <div class="meter"><i style="width:${Math.min(100, u.percent)}%"></i></div>`;
     }
     $('repos').innerHTML = (meta.repos || []).map(r => `<option value="${esc(r)}">`).join('');
+    const d = meta.deploy;  // deploy.sh's last result: ok is null while it runs
+    $('deploy').classList.toggle('hidden', !d);
+    if (d) {
+      $('deploy-dot').style.background = `var(${d.ok ? '--work' : d.ok === false ? '--bad' : '--pause'})`;
+      $('deploy-msg').textContent = `${d.at ? ago(d.at) + ' · ' : ''}${d.message}`;
+    }
   }
+  $('deploy-x').onclick = async () => { await api('/api/deploy', { method: 'DELETE' }); $('deploy').classList.add('hidden'); };
 
   $('new').onsubmit = async e => {
     e.preventDefault();

@@ -1,9 +1,11 @@
 [Unit]
-Description=Check GitHub for a new main every 2 minutes
+Description=Check GitHub for a new main every 20 seconds
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=2min
+OnBootSec=20s
+OnUnitActiveSec=20s
+# The default 1-minute accuracy would stretch 20s ticks to up to a minute.
+AccuracySec=1s
 
 [Install]
 WantedBy=timers.target

@@ -4,119 +4,160 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FEMME board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&family=Schibsted+Grotesk:wght@400;500&family=VT323&display=swap">
 <style>
-  :root { --bg: #f6f5f2; --card: #fff; --ink: #1d1c1a; --muted: #6b6862; --line: #e3e0da; --accent: #2f5d50; --on-accent: #fff;
-          --work: #2f5d50; --pause: #9a6b12; --pr: #3d4fa8; --bad: #a33a2a; --done: #8a877f; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #161615; --card: #201f1d; --ink: #eceae6; --muted: #9d9a94; --line: #34322f; --accent: #7fb8a4; --on-accent: #10201b;
-            --work: #7fb8a4; --pause: #e0b25a; --pr: #9aa8f0; --bad: #e08a7a; --done: #8a877f; }
-  }
+  /* Look of typesafe.ai: a Lisa-era desktop (pink, dot grid) with black-titled windows. Light only, as typesafe.ai is. */
+  :root { --desk: #F386A1; --paper: #FEFEFE; --panel: #E5E5E5; --ink: #1E1E1E; --muted: #5c5c5c; --hover: #D45BB6;
+          --work: #03AA5C; --pause: #F2B33D; --queue: #DEDEDE; --pr: #09AEA1; --bad: #D93036; --done: #858585;
+          --pixel: VT323, ui-monospace, monospace; --mono: "JetBrains Mono", ui-monospace, monospace; color-scheme: light; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  ::selection { background: var(--hover); color: var(--ink); }
+  body { margin: 0; min-height: 100vh; color: var(--ink); font: 16px/1.4 "Schibsted Grotesk", system-ui, sans-serif; letter-spacing: .02em;
+         background: var(--desk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect x='2' y='2' width='1' height='1' fill='%231e1e1e'/%3E%3C/svg%3E"); }
   .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
-  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
-  h1 { font-size: 20px; margin: 0; letter-spacing: .02em; flex: 1; }
-  .pill { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: var(--card); }
-  .bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; margin-top: 4px; }
-  .bar i { display: block; height: 100%; background: var(--accent); }
-  form, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
-  form { padding: 14px; display: grid; gap: 10px; margin-bottom: 20px; }
-  input, textarea, button { font: inherit; border-radius: 9px; }
-  input, textarea { width: 100%; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 10px 12px; }
+  .nav { background: var(--paper); border-bottom: 1.2px solid var(--ink); }
+  .nav .wrap { display: flex; align-items: center; gap: 12px; padding-block: 6px; }
+  h1 { flex: 1; margin: 0; font-size: 24px; font-weight: 500; -webkit-text-stroke: .5px currentColor; }
+  h1 small { font: 12px var(--mono); letter-spacing: .05em; color: var(--muted); -webkit-text-stroke: 0; margin-left: 6px; }
+  .win { display: block; border: 1.2px solid var(--ink); background: var(--desk); margin: 0 0 20px; }
+  .tb { display: flex; align-items: center; gap: 8px; margin: 0; padding: 3px 8px; background: var(--ink); color: var(--desk);
+        font: 22px/1 var(--pixel); font-weight: normal; letter-spacing: .01em; text-transform: lowercase; }
+  .tb b { width: 10px; height: 10px; flex: none; }
+  .frame { display: grid; grid-template-columns: minmax(0, 1fr); gap: 3px; padding: 3px; }
+  .card { background: var(--paper); border: 1.2px solid var(--ink); padding: 10px 12px; }
+  .dialog { background: var(--panel); box-shadow: 3px 3px 0 rgba(0, 0, 0, .4); }
+  .dialog .tb { color: var(--paper); }
+  #usage { padding: 8px; font: 20px/1.1 var(--pixel); }
+  .meter { height: 20px; border: 1.2px solid var(--ink); background: var(--paper); margin-top: 6px; }
+  .meter i { display: block; height: 100%; background: var(--ink); }
+  .form { display: grid; gap: 10px; }
+  input, textarea, button { font: inherit; border-radius: 0; }
+  input, textarea { width: 100%; border: 1.2px solid var(--ink); background: var(--paper); color: var(--ink); padding: 9px 10px; }
+  ::placeholder { color: #767676; }
   textarea { min-height: 90px; resize: vertical; }
-  button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 7px 12px; cursor: pointer; }
-  button.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; padding: 10px 14px; }
-  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 8px; display: flex; gap: 8px; align-items: center; }
-  h2 b { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-  .card { padding: 12px 14px; margin-bottom: 8px; }
-  .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
-  .title { font-weight: 600; margin: 2px 0; overflow-wrap: anywhere; }
-  .body { white-space: pre-wrap; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; margin-top: 4px; }
-  .note { font-size: 13px; margin-top: 6px; overflow-wrap: anywhere; }
+  button { font: 20px/1 var(--pixel); height: 34px; padding: 0 10px; border: 1.2px solid var(--ink); background: var(--paper); color: var(--ink);
+           cursor: pointer; transition: background-color .2s; }
+  button:hover { background: var(--hover); }
+  button.dark { background: var(--ink); color: var(--paper); }
+  button.dark:hover { background: var(--hover); color: var(--ink); }
+  .form > button { height: 42px; font-size: 22px; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .meta { font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+  .title { font-size: 17px; font-weight: 500; margin: 4px 0 2px; overflow-wrap: anywhere; }
+  .body { white-space: pre-wrap; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; margin-top: 6px; padding-left: 10px; border-left: 1.2px dashed var(--ink); }
+  .note { font-size: 14px; margin-top: 6px; overflow-wrap: anywhere; }
   .actions { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-  a { color: var(--pr); }
-  .empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
-  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  a { color: var(--ink); text-decoration-thickness: 1.2px; text-underline-offset: 4px; }
+  a:hover { text-decoration-thickness: 3px; text-decoration-color: var(--hover); }
+  .empty { font: 13px var(--mono); padding: 4px 6px; }
+  summary { cursor: pointer; }
+  .card summary { font: 12px var(--mono); color: var(--muted); margin-top: 6px; }
+  .win > summary { list-style: none; }
+  .win > summary::-webkit-details-marker { display: none; }
+  .win > summary .tb::after { content: "[+]"; margin-left: auto; }
+  .win[open] > summary .tb::after { content: "[-]"; }
   .err { color: var(--bad); font-size: 14px; }
-  #chat { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; z-index: 10; }
-  #chat.open { display: flex; }
-  #chat .top { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  #chat .top b { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #screen { flex: 1; margin: 0; padding: 12px 16px; overflow: auto; font: 12px/1.35 ui-monospace, "SF Mono", Menlo, monospace;
-            white-space: pre-wrap; overflow-wrap: anywhere; background: var(--card); }
-  #chat form { margin: 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 10px 16px 16px; }
-  #chat textarea { min-height: 52px; }
-  .keys { display: flex; gap: 6px; flex-wrap: wrap; }
-  .keys button { min-width: 44px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-  .tabs button { flex: 1; padding: 10px; font-weight: 600; }
-  .tabs button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .err:empty { display: none; }
+  .hidden { display: none !important; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  .tabs button { flex: 1; height: 42px; font-size: 22px; }
+  .tabs button.on { background: var(--ink); color: var(--paper); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  select { font: inherit; border-radius: 0; border: 1.2px solid var(--ink); background: var(--paper); color: var(--ink); padding: 9px 10px; }
   .term { display: flex; align-items: center; gap: 10px; cursor: pointer; }
   .term .grow { flex: 1; min-width: 0; }
-  .term .cwd { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); flex: none; }
-  .dot.working { background: var(--work); } .dot.blocked, .dot.done { background: var(--pause); } .dot.idle { background: var(--muted); }
-  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .row select { font: inherit; border-radius: 9px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 9px 10px; }
-  .hidden { display: none !important; }
-  .st { font-size: 12px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--line); color: var(--muted); }
+  .term .cwd { font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 10px; height: 10px; border: 1.2px solid var(--ink); background: var(--paper); flex: none; }
+  .dot.working { background: var(--work); } .dot.blocked, .dot.done { background: var(--pause); } .dot.idle { background: var(--done); }
+  .st { font: 18px/1 var(--pixel); letter-spacing: .01em; padding: 1px 6px; border: 1.2px solid currentColor; }
+  #chat { position: fixed; inset: 0; background: inherit; display: none; flex-direction: column; z-index: 10; }
+  #chat.open { display: flex; }
+  #chat .top { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: var(--ink); color: var(--desk); font: 22px/1 var(--pixel); }
+  #chat .top b { flex: 1; font-weight: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #chat .top button { height: 30px; }
+  #screen { flex: 1; margin: 6px 6px 0; padding: 10px 12px; overflow: auto; font: 12px/1.35 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
+            background: var(--ink); color: var(--panel); }
+  #say { margin: 6px; padding: 10px; background: var(--paper); border: 1.2px solid var(--ink); }
+  #say textarea { min-height: 52px; }
+  .keys { display: flex; gap: 6px; flex-wrap: wrap; }
+  .keys button { min-width: 44px; }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>FEMME</h1>
-    <div class="pill" id="usage">usage: waiting for worker</div>
-    <button id="out">Sign out</button>
-  </header>
+<header class="nav">
+  <div class="wrap">
+    <h1>FEMME<small>board</small></h1>
+    <button id="out" class="dark">Sign out</button>
+  </div>
+</header>
+<main class="wrap">
+  <section class="win dialog">
+    <h2 class="tb">usage</h2>
+    <div id="usage">waiting for worker</div>
+  </section>
 
   <div class="tabs"><button id="tab-terms">Terminals</button><button id="tab-issues">Issues</button></div>
 
   <section id="v-terms" class="hidden">
-    <form id="newterm">
-      <input id="folder" list="folders" placeholder="Folder (empty = home)" autocapitalize="off" autocorrect="off" spellcheck="false">
-      <datalist id="folders"></datalist>
-      <div class="row">
-        <select id="agent"><option value="claude">Claude</option><option value="codex">Codex</option><option value="pi">Pi</option><option value="">Shell</option></select>
-        <input id="tlabel" placeholder="Name (optional)" style="flex:1;min-width:120px">
+    <form id="newterm" class="win">
+      <h2 class="tb">new terminal</h2>
+      <div class="frame">
+        <div class="card form">
+          <input id="folder" list="folders" placeholder="Folder (empty = home)" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <datalist id="folders"></datalist>
+          <div class="row">
+            <select id="agent"><option value="claude">Claude</option><option value="codex">Codex</option><option value="pi">Pi</option><option value="">Shell</option></select>
+            <input id="tlabel" placeholder="Name (optional)" style="flex:1;min-width:120px">
+          </div>
+          <button class="dark">Open terminal</button>
+          <div class="err" id="terr" role="alert"></div>
+        </div>
       </div>
-      <button class="primary">Open terminal</button>
-      <div class="err" id="terr" role="alert"></div>
     </form>
-    <div id="terms"></div>
+    <section class="win">
+      <h2 class="tb">terminals</h2>
+      <div class="frame" id="terms"></div>
+    </section>
   </section>
 
   <section id="v-issues" class="hidden">
-  <form id="new">
-    <input id="repo" list="repos" placeholder="owner/repo" required autocapitalize="off" autocorrect="off" spellcheck="false">
-    <datalist id="repos"></datalist>
-    <input id="title" placeholder="What should be done?" required>
-    <textarea id="body" placeholder="Details, acceptance criteria, files to look at (optional)"></textarea>
-    <button class="primary">Add to queue</button>
-    <div class="err" id="err" role="alert"></div>
-  </form>
+    <form id="new" class="win">
+      <h2 class="tb">new issue</h2>
+      <div class="frame">
+        <div class="card form">
+          <input id="repo" list="repos" placeholder="owner/repo" required autocapitalize="off" autocorrect="off" spellcheck="false">
+          <datalist id="repos"></datalist>
+          <input id="title" placeholder="What should be done?" required>
+          <textarea id="body" placeholder="Details, acceptance criteria, files to look at (optional)"></textarea>
+          <button class="dark">Add to queue</button>
+          <div class="err" id="err" role="alert"></div>
+        </div>
+      </div>
+    </form>
 
-  <div id="board"></div>
+    <div id="board"></div>
   </section>
-</div>
+</main>
 
 <div id="chat" role="dialog" aria-label="Chat with the agent">
   <div class="top"><b id="chat-title"></b><span class="st" id="chat-st"></span><button id="chat-kill">End</button><button id="chat-close">Back</button></div>
   <pre id="screen"></pre>
-  <form id="say">
+  <form id="say" class="form">
     <div class="keys">
       <button type="button" data-key="1">1</button><button type="button" data-key="2">2</button><button type="button" data-key="3">3</button>
       <button type="button" data-key="enter">Enter</button><button type="button" data-key="esc">Esc</button>
       <button type="button" data-key="up">↑</button><button type="button" data-key="down">↓</button>
     </div>
     <textarea id="msg" placeholder="Message the agent"></textarea>
-    <button class="primary">Send</button>
+    <button class="dark">Send</button>
     <div class="err" id="chat-err" role="alert"></div>
   </form>
 </div>
 <script>
   const SECTIONS = [
-    ['waiting', 'Needs you', '--pause'], ['working', 'Working', '--work'], ['paused', 'Paused', '--muted'], ['open', 'Queue', '--muted'],
+    ['waiting', 'Needs you', '--pause'], ['working', 'Working', '--work'], ['paused', 'Paused', '--queue'], ['open', 'Queue', '--queue'],
     ['pr', 'PR ready', '--pr'], ['failed', 'Failed', '--bad'], ['done', 'Done', '--done'],
   ];
   const $ = id => document.getElementById(id);
@@ -149,13 +190,15 @@
     const [issues, meta] = await Promise.all([api('/api/issues').then(r => r.json()), api('/api/meta').then(r => r.json())]);
     $('board').innerHTML = SECTIONS.map(([key, label, color]) => {
       const rows = issues.filter(i => i.status === key).sort((a, b) => key === 'open' ? a.id - b.id : (b.updated || 0) - (a.updated || 0));
-      if (key === 'done' && rows.length) return `<details><summary><h2 style="display:inline-flex"><b style="background:var(${color})"></b>${label} (${rows.length})</h2></summary>${rows.map(card).join('')}</details>`;
-      return `<h2><b style="background:var(${color})"></b>${label}${rows.length ? ` (${rows.length})` : ''}</h2>${rows.length ? rows.map(card).join('') : '<div class="empty">nothing here</div>'}`;
+      const bar = `<h2 class="tb"><b style="background:var(${color})"></b>${label}${rows.length ? ` (${rows.length})` : ''}</h2>`;
+      const cards = rows.length ? rows.map(card).join('') : '<div class="empty">nothing here</div>';
+      if (key === 'done' && rows.length) return `<details class="win"><summary>${bar}</summary><div class="frame">${cards}</div></details>`;
+      return `<section class="win">${bar}<div class="frame">${cards}</div></section>`;
     }).join('');
     if (meta.usage) {
       const u = meta.usage, cap = meta.cap ?? 60;
       $('usage').innerHTML = `Claude ${u.percent}% · agents pause at ${cap}% · resets ${u.resets_at ? clock(u.resets_at) : '?'}${meta.state ? ' · ' + esc(meta.state) : ''}
-        <div class="bar"><i style="width:${Math.min(100, u.percent)}%"></i></div>`;
+        <div class="meter"><i style="width:${Math.min(100, u.percent)}%"></i></div>`;
     }
     $('repos').innerHTML = (meta.repos || []).map(r => `<option value="${esc(r)}">`).join('');
   }

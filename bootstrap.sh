@@ -43,7 +43,13 @@ if [ -n "${BOARD_URL:-}" ]; then
   # Copy then rename: the running binary can't be written over.
   cp board/target/release/femme-board ~/.local/bin/femme-board.new
   mv ~/.local/bin/femme-board.new ~/.local/bin/femme-board
-  units="$units femme-board femme-worker"
+  # cswap: the board's accounts window and femme-cswap's auto-rotation. Its own venv, pinned.
+  ~/.local/share/cswap/bin/cswap --version >/dev/null 2>&1 \
+    || { python3 -m venv --clear ~/.local/share/cswap && ~/.local/share/cswap/bin/pip install -q claude-swap==0.27.2; }
+  ln -sf ~/.local/share/cswap/bin/cswap ~/.local/bin/cswap
+  # The box's own login becomes account 1 (fails harmlessly before the first /login).
+  cswap list --json | jq -e '.accounts | length > 0' >/dev/null || cswap add || echo "WARN: cswap add failed; log in with claude, then rerun" >&2
+  units="$units femme-board femme-worker femme-cswap"
 fi
 
 mkdir -p ~/.config/systemd/user
@@ -52,6 +58,6 @@ for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
 [ -z "${BOARD_URL:-}" ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
 systemctl --user daemon-reload
 systemctl --user enable --now $units
-systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker}
+systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker femme-cswap}
 herdr server reload-config >/dev/null 2>&1 || true
 systemctl --user is-active $units

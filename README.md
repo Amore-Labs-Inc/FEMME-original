@@ -71,7 +71,16 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 - **Chat** on a card opens that agent's live screen: reply, press 1/2/3/Enter/Esc, or end it.
 - **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, chat with it the same way, or close it.
 - Merging to `main` deploys itself: every 20 seconds `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
-- Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Both are env vars on `femme-worker.service`.
+- Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Set both in `.env`.
+
+### Accounts
+
+The board's **accounts** window lists every Claude account stored with [cswap](https://pypi.org/project/claude-swap/), with each account's 5-hour and 7-day usage.
+
+- **+ add**: open the sign-in link, log in on claude.ai with the new account, paste the code it shows into the board. The board signs in a separate config dir, runs `cswap add` from there, and leaves the VPS's live login alone. Never run `/logout`: it drops the stored accounts.
+- Click an account to switch the VPS to it (`cswap switch`).
+- `femme-cswap.service` runs `cswap auto --threshold $CAP`: when the active account passes `CAP` it switches to the account with the most left, so agents only pause once every account is past `CAP` (keep it 50-99).
+- `bootstrap.sh` installs cswap and saves the VPS's current login as account 1.
 
 ## Files
 
@@ -87,6 +96,7 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 | `fork-remote.sh` | laptop | The herdr plugin action. |
 | `board/` | VPS | The issues board server (Rust). |
 | `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |
+| `systemd/femme-cswap.service` | VPS | Auto-rotates Claude accounts at `CAP`. |
 | `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
 
 ## Cost

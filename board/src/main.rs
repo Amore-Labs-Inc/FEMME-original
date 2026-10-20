@@ -2,15 +2,19 @@
 //! Sign-in: a magic link to the one allowed address (BOARD_EMAIL), sent through Resend,
 //! then a 7-day cookie. Listens on localhost; Caddy in front adds TLS.
 //! The worker (worker.sh) uses the same API with the bearer token in <state>/worker.token.
+//! Claude accounts on the box are cswap's: the board lists, switches and adds them.
 
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
     env, fs,
     io::{Cursor, Read, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    process::{Child, Command, Stdio},
+    sync::{Arc, Mutex},
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tiny_http::{Header, Method, Request, Response, Server};
 
@@ -40,6 +44,78 @@ struct App {
     url: String,
     resend_key: String,
     from: String,
+    accounts: Arc<Mutex<Value>>, // last `cswap list --json`, refreshed in the background
+    login: Option<Login>,        // an account being added
+}
+
+/// A new account's `claude auth login`, run in its own config dir so the box's live login
+/// (and every agent on it) stays untouched; `cswap add` then stores it from there.
+struct Login {
+    child: Child,
+    dir: PathBuf,
+    started: u64,
+}
+
+impl Login {
+    fn start(dir: PathBuf) -> Result<Login, String> {
+        let _ = fs::remove_dir_all(&dir);
+        fs::DirBuilder::new().mode(0o700).create(&dir).map_err(|e| e.to_string())?;
+        let log = fs::File::create(dir.join("out")).map_err(|e| e.to_string())?;
+        let child = Command::new("claude")
+            .args(["auth", "login"])
+            .env("CLAUDE_CONFIG_DIR", &dir)
+            .env("BROWSER", "true") // nothing to open here: the link goes to the board
+            .stdin(Stdio::piped())
+            .stdout(log.try_clone().map_err(|e| e.to_string())?)
+            .stderr(log)
+            .spawn()
+            .map_err(|e| format!("claude: {e}"))?;
+        let mut login = Login { child, dir, started: now() };
+        for _ in 0..75 {
+            if login.url().is_some() {
+                return Ok(login);
+            }
+            if login.child.try_wait().ok().flatten().is_some() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(200));
+        }
+        Err(last_line(&login.output()).unwrap_or("claude printed no sign-in link").into())
+    }
+
+    fn output(&self) -> String {
+        fs::read_to_string(self.dir.join("out")).unwrap_or_default()
+    }
+
+    fn url(&self) -> Option<String> {
+        login_url(&self.output())
+    }
+
+    /// Hands claude the code from claude.ai; once it has signed in, cswap adds the account.
+    fn finish(&mut self, code: &str) -> Result<(), String> {
+        let stdin = self.child.stdin.as_mut().ok_or("the login has ended; start again")?;
+        writeln!(stdin, "{code}").map_err(|e| e.to_string())?;
+        for _ in 0..150 {
+            if let Some(status) = self.child.try_wait().map_err(|e| e.to_string())? {
+                if !status.success() {
+                    let out = self.output();
+                    let why = last_line(&out).unwrap_or("login failed");
+                    return Err(why.trim_start_matches("Paste code here if prompted > ").into());
+                }
+                return cswap(&["add"], Some(&self.dir)).map(drop);
+            }
+            thread::sleep(Duration::from_millis(200));
+        }
+        Err("the login did not finish; start again".into())
+    }
+}
+
+impl Drop for Login {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        let _ = fs::remove_dir_all(&self.dir);
+    }
 }
 
 fn main() {
@@ -63,11 +139,21 @@ fn main() {
         url: var("BOARD_URL").trim_end_matches('/').into(),
         resend_key: var("RESEND_API_KEY"),
         from: var("MAIL_FROM"),
+        accounts: Arc::new(Mutex::new(Value::Null)),
+        login: None,
     };
     assert!(!app.email.is_empty() && !app.url.is_empty(), "BOARD_EMAIL and BOARD_URL must be set");
     if app.resend_key.is_empty() {
         eprintln!("RESEND_API_KEY is not set: sign-in links are printed here instead of emailed");
     }
+
+    // cswap can take a few seconds when it fetches usage, so it never runs inside a page load.
+    let cache = app.accounts.clone();
+    thread::spawn(move || loop {
+        let list = cswap_list();
+        *cache.lock().unwrap() = list;
+        thread::sleep(Duration::from_secs(30));
+    });
 
     let addr = env::var("FEMME_BOARD_ADDR").unwrap_or_else(|_| "127.0.0.1:8787".into());
     let server = Server::http(&addr).expect("cannot bind");
@@ -241,6 +327,55 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             }
             herdr(&["pane", "send-keys", pane, key]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
         }
+        // Claude accounts (cswap): usage of each, switch the box to one, or add one. Adding is
+        // two steps: start a login and show its link, then take the code claude.ai gives you.
+        (Method::Get, ["api", "accounts"]) => {
+            if app.login.as_ref().is_some_and(|l| now() > l.started + LINK_SECS) {
+                app.login = None; // its code would have expired by now
+            }
+            ok(accounts(app))
+        }
+        (Method::Post, ["api", "accounts", "switch"]) => {
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let n = input["account"].as_str().unwrap_or("");
+            if n.is_empty() || n.len() > 3 || !n.bytes().all(|b| b.is_ascii_digit()) {
+                return err(400, "account must be a number");
+            }
+            if let Err(e) = cswap(&["switch", n, "--json"], None) {
+                return err(502, &e);
+            }
+            *app.accounts.lock().unwrap() = cswap_list();
+            ok(accounts(app))
+        }
+        (Method::Post, ["api", "accounts", "login"]) => {
+            app.login = None; // ends an earlier attempt first
+            match Login::start(app.meta.with_file_name("login")) {
+                Ok(login) => {
+                    app.login = Some(login);
+                    ok(accounts(app))
+                }
+                Err(e) => err(502, &e),
+            }
+        }
+        (Method::Post, ["api", "accounts", "code"]) => {
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let code = input["code"].as_str().unwrap_or("").trim();
+            if code.is_empty() || code.len() > 1000 || code.chars().any(|c| c.is_whitespace() || c.is_control()) {
+                return err(400, "paste the code exactly as claude.ai shows it");
+            }
+            let Some(mut login) = app.login.take() else { return err(409, "that login ended; press + add again") };
+            let added = login.finish(code);
+            drop(login);
+            *app.accounts.lock().unwrap() = cswap_list();
+            match added {
+                Ok(()) => ok(accounts(app)),
+                Err(e) => err(502, &e),
+            }
+        }
+        (Method::Delete, ["api", "accounts", "login"]) => {
+            app.login = None;
+            ok(accounts(app))
+        }
         (Method::Delete, ["api", "issues", id]) => {
             let before = app.issues.len();
             app.issues.retain(|i| !id_matches(i, id));
@@ -404,6 +539,44 @@ fn herdr(args: &[&str]) -> Result<String, String> {
     }
 }
 
+/// Runs cswap without a shell. `config` points it at another Claude config dir (a new login).
+fn cswap(args: &[&str], config: Option<&Path>) -> Result<String, String> {
+    let mut cmd = Command::new("cswap");
+    cmd.args(args).env("NO_COLOR", "1").stdin(Stdio::null());
+    if let Some(dir) = config {
+        cmd.env("CLAUDE_CONFIG_DIR", dir);
+    }
+    let out = cmd.output().map_err(|e| format!("cswap: {e}"))?;
+    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+    if out.status.success() {
+        return Ok(stdout);
+    }
+    // With --json, errors come on stdout as {"error": {"message": ...}}.
+    let json_error = serde_json::from_str::<Value>(&stdout).ok().and_then(|v| v["error"]["message"].as_str().map(String::from));
+    Err(json_error.unwrap_or_else(|| format!("{stdout}{}", String::from_utf8_lossy(&out.stderr)).trim().to_string()))
+}
+
+fn cswap_list() -> Value {
+    cswap(&["list", "--json"], None)
+        .and_then(|o| serde_json::from_str(&o).map_err(|e| e.to_string()))
+        .unwrap_or_else(|e| json!({"error": e}))
+}
+
+fn accounts(app: &App) -> Value {
+    let login = app.login.as_ref().and_then(Login::url).map(|url| json!({"url": url}));
+    json!({"cswap": app.accounts.lock().unwrap().clone(), "login": login})
+}
+
+/// The sign-in link in `claude auth login`'s output, which may wrap it in a terminal hyperlink.
+fn login_url(out: &str) -> Option<String> {
+    let url: String = out[out.find("https://")?..].chars().take_while(|c| !c.is_whitespace() && !c.is_control()).collect();
+    url.contains("/oauth/authorize?").then_some(url)
+}
+
+fn last_line(s: &str) -> Option<&str> {
+    s.lines().map(str::trim).filter(|l| !l.is_empty()).last()
+}
+
 fn valid_repo(s: &str) -> bool {
     let ok = |p: &str| {
         !p.is_empty() && !p.starts_with(['.', '-']) && p.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
@@ -528,6 +701,17 @@ mod tests {
         assert!(home_dir(&home, "/etc").is_none());
         assert!(home_dir(&home, home.join("missing").to_str().unwrap()).is_none());
         fs::remove_dir_all(&home).unwrap();
+    }
+
+    #[test]
+    fn login_url_finds_the_link_plain_or_hyperlinked() {
+        let url = "https://claude.com/cai/oauth/authorize?code=true&client_id=x&state=y";
+        let plain = format!("Opening browser to sign in…\nIf the browser didn't open, visit: {url}\nPaste code here if prompted > ");
+        assert_eq!(login_url(&plain).as_deref(), Some(url));
+        let osc8 = format!("visit: \x1b]8;;{url}\x07{url}\x1b]8;;\x07\n");
+        assert_eq!(login_url(&osc8).as_deref(), Some(url));
+        assert_eq!(login_url("visit: https://example.com/elsewhere"), None);
+        assert_eq!(login_url("Paste code here if prompted > "), None);
     }
 
     #[test]

@@ -1,0 +1,14 @@
+[Unit]
+Description=FEMME auto-rotate: switch to another Claude account (cswap) when the active one passes CAP
+After=network-online.target
+
+[Service]
+EnvironmentFile=%h/femme/.env
+Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# $$ is a literal $ for the shell; systemd would expand ${CAP} itself. Same CAP as the worker's pause.
+ExecStart=/bin/sh -c 'exec cswap auto --threshold "$${CAP:-60}"'
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=default.target

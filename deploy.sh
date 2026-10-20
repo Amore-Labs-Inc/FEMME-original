@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs on the VPS from femme-deploy.timer. When main moves on GitHub (a PR merged), check it out
 # here and rerun bootstrap.sh, which rebuilds the board and restarts the services. The result
-# shows on the board until you close it. The first run only records where main is.
+# shows on the board until you close it.
 set -uo pipefail
 cd "$(dirname "$0")"
 # Braces: bash reads the whole block before running it, so the reset below can rewrite this file.
@@ -13,9 +13,9 @@ cd "$(dirname "$0")"
   }
   git fetch -q origin main || exit 0  # offline: next tick tries again
   new=$(git rev-parse origin/main)
-  [ -s "$state/deployed" ] || { echo "$new" > "$state/deployed"; exit 0; }
+  [ -s "$state/deployed" ] || git rev-parse HEAD > "$state/deployed"  # first run: what sync.sh put here is live
   [ "$new" = "$(cat "$state/deployed")" ] && exit 0
-  echo "$new" > "$state/deployed"  # before deploying: a broken commit is tried once, not every 2 minutes
+  echo "$new" > "$state/deployed"  # before deploying: a broken commit is tried once, not every tick
   git reset -q --hard "$new"
   what=$(git log -1 --format='%h %s')
   report null "deploying $what"

@@ -70,6 +70,7 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
 - **Chat** on a card opens that agent's live screen: reply, press 1/2/3/Enter/Esc, or end it.
 - **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, chat with it the same way, or close it.
+- Merging to `main` deploys itself: every 2 minutes `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Both are env vars on `femme-worker.service`.
 
 ## Files
@@ -80,7 +81,8 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 | `cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, mosh, 8 GB swap, linger. |
 | `sync.sh` | laptop | Copies config: `~/.claude` minus credentials and history, herdr, mise. Merges onboarding, trust and portable MCP servers into the VPS `~/.claude.json`. |
 | `sync-dir.sh` | laptop | Puts one folder in live two-way sync with the VPS. |
-| `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units. |
+| `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units; builds the board. |
+| `deploy.sh` | VPS | On a timer: deploys `main` after a merge. |
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
 | `fork-remote.sh` | laptop | The herdr plugin action. |
 | `board/` | VPS | The issues board server (Rust). |

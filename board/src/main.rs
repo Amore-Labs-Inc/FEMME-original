@@ -16,6 +16,7 @@ use tiny_http::{Header, Method, Request, Response, Server};
 
 const PAGE: &str = include_str!("index.html");
 const LOGIN: &str = include_str!("login.html");
+const LOGO: &str = include_str!("logo.svg"); // also the favicon
 const MAX_BODY: u64 = 1 << 20;
 const SESSION_SECS: u64 = 7 * 86400;
 const LINK_SECS: u64 = 15 * 60;
@@ -92,6 +93,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
     // Public routes: the sign-in flow.
     match (&method, parts.as_slice()) {
         (Method::Get, ["login"]) | (Method::Get, ["magic", _]) => return html(LOGIN),
+        (Method::Get, ["logo.svg"]) => return with_type(Response::from_string(LOGO), "image/svg+xml"),
         (Method::Post, ["api", "login"]) => {
             let input = read_json(req).unwrap_or_default();
             let asked = input["email"].as_str().unwrap_or("").trim().to_lowercase();

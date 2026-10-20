@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FEMME board</title>
+<title>FEMME</title>
+<link rel="icon" href="/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400&family=Schibsted+Grotesk:wght@400;500&family=VT323&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=JetBrains+Mono:wght@400&family=Schibsted+Grotesk:wght@400;500&family=VT323&display=swap">
 <style>
   /* Look of typesafe.ai: a Lisa-era desktop (pink, dot grid) with black-titled windows. Light only, as typesafe.ai is. */
-  :root { --desk: #F386A1; --paper: #FEFEFE; --panel: #E5E5E5; --ink: #1E1E1E; --muted: #5c5c5c; --hover: #D45BB6;
+  :root { --desk: #F386A1; --paper: #FEFEFE; --panel: #E5E5E5; --ink: #1E1E1E; --muted: #5c5c5c; --hover: #D45BB6; --neon: #FF4FB4;
           --work: #03AA5C; --pause: #F2B33D; --queue: #DEDEDE; --pr: #09AEA1; --bad: #D93036; --done: #858585;
           --pixel: VT323, ui-monospace, monospace; --mono: "JetBrains Mono", ui-monospace, monospace; color-scheme: light; }
   * { box-sizing: border-box; }
@@ -19,8 +20,10 @@
   .wrap { max-width: 760px; margin: 0 auto; padding: 16px; }
   .nav { background: var(--paper); border-bottom: 1.2px solid var(--ink); }
   .nav .wrap { display: flex; align-items: center; gap: 12px; padding-block: 6px; }
-  h1 { flex: 1; margin: 0; font-size: 24px; font-weight: 500; -webkit-text-stroke: .5px currentColor; }
-  h1 small { font: 12px var(--mono); letter-spacing: .05em; color: var(--muted); -webkit-text-stroke: 0; margin-left: 6px; }
+  /* The logo: a Vice City sunset and the wordmark in Kaushan Script, a free stand-in for Vice City's Rage Italic. */
+  h1 { flex: 1; margin: 0; display: flex; align-items: center; gap: 10px; font: 400 34px/1.1 "Kaushan Script", cursive;
+       color: var(--neon); text-shadow: 2px 2px 0 var(--ink); letter-spacing: .03em; }
+  h1 img { width: 36px; height: 36px; }
   .win { display: block; border: 1.2px solid var(--ink); background: var(--desk); margin: 0 0 20px; }
   .tb { display: flex; align-items: center; gap: 8px; margin: 0; padding: 3px 8px; background: var(--ink); color: var(--desk);
         font: 22px/1 var(--pixel); font-weight: normal; letter-spacing: .01em; text-transform: lowercase; }
@@ -90,7 +93,7 @@
 <body>
 <header class="nav">
   <div class="wrap">
-    <h1>FEMME<small>board</small></h1>
+    <h1><img src="/logo.svg" alt="">FEMME</h1>
     <button id="out" class="dark">Sign out</button>
   </div>
 </header>

@@ -393,6 +393,8 @@
   // Pasted or dropped files (a screenshot, a PDF) go to the box and their path is typed in;
   // Claude Code attaches a pasted image path as the image itself.
   async function upload(files) {
+    // ponytail: files land on the VPS, so a linked laptop's terminal can't open them.
+    if (chatPane.includes('~')) return say('files only reach VPS terminals', true);
     for (const f of files) {
       if (f.size > 20 << 20) { say(`${f.name}: files up to 20 MB`, true); continue; }
       say(`uploading ${f.name || 'image'}…`);
@@ -452,9 +454,9 @@
     const d = await r.json();
     $('folders').innerHTML = d.folders.map(f => `<option value="${esc(f)}">`).join('');
     $('terms').innerHTML = d.workspaces.length ? d.workspaces.map(w => w.panes.map(p => `
-      <div class="card term" data-pane="${esc(p.pane_id)}" data-title="${esc(w.label + (p.title ? ' · ' + p.title : ''))}">
+      <div class="card term" data-pane="${esc(p.pane_id)}" data-title="${esc((w.machine ? w.machine + ' · ' : '') + w.label + (p.title ? ' · ' + p.title : ''))}">
         <span class="dot ${esc(p.status || '')}"></span>
-        <div class="grow"><div class="title">${esc(w.label)}${w.panes.length > 1 ? ` <span class="st">${esc(p.pane_id)}</span>` : ''}</div>
+        <div class="grow"><div class="title">${esc(w.label)}${w.machine ? ` <span class="st">${esc(w.machine)}</span>` : ''}${w.panes.length > 1 ? ` <span class="st">${esc(p.pane_id.split('~').pop())}</span>` : ''}</div>
           <div class="cwd">${esc(p.agent || 'shell')}${p.status && p.status !== 'unknown' ? ' · ' + esc(p.status) : ''}${p.title ? ' · ' + esc(p.title) : ''}</div>
           <div class="cwd">${esc(p.cwd || '')}</div></div>
       </div>`).join('')).join('') : '<div class="empty">no terminals</div>';

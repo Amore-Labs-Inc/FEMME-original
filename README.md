@@ -30,6 +30,7 @@ Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`). `.env` i
 herdr machine add agentbox --label agentbox --remote-session default
 herdr plugin link "$PWD"                    # or: herdr plugin install Darkosxl/FEMME --yes
 cp systemd/mutagen.service ~/.config/systemd/user/ && systemctl --user enable --now mutagen
+cp systemd/femme-link.service ~/.config/systemd/user/ && systemctl --user enable --now femme-link  # laptop terminals on the board
 ```
 
 Add to `~/.config/herdr/config.toml`, then `herdr server reload-config`:
@@ -70,6 +71,7 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
 - **Chat** on a card opens that agent's terminal: a real terminal (xterm.js) showing the pane's live screen in colour. Type straight into it (keys, arrows, Ctrl-C, paste); on a phone the key bar has Esc, Tab, arrows, Ctrl-C and Enter. Paste or drop an image or file (or use the upload button): it is saved to `~/.local/state/femme/uploads` (kept 7 days) and its path is typed in, which Claude Code attaches as an image. **End** closes the workspace.
 - **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, use it the same way, or close it.
+- Linked laptops' workspaces are listed there too, tagged with the laptop's hostname, while it is awake. `femme-link.service` forwards the laptop's herdr socket to `~/.config/herdr/remote/<hostname>.sock` on the VPS over SSH. New terminals open on the VPS only, and uploads only reach VPS terminals. Anything running as your user on the VPS, agents included, can then type into the laptop's terminals.
 - Merging to `main` deploys itself: every 20 seconds `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Set both in `.env`.
 
@@ -99,6 +101,7 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |
 | `systemd/femme-cswap.service` | VPS | Auto-rotates Claude accounts at `CAP`. |
 | `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
+| `systemd/femme-link.service` | laptop | Puts the laptop's herdr terminals on the board. |
 
 ## Cost
 

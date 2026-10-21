@@ -31,6 +31,12 @@ for a in claude codex pi opencode; do herdr integration install "$a" || echo "WA
 grep -q '^\[experimental\]' ~/.config/herdr/config.toml 2>/dev/null \
   || printf '\n[experimental]\n# single-user box: keep screen history across reboots\npane_history = true\n' >> ~/.config/herdr/config.toml
 
+# Linked laptops (systemd/femme-link.service) forward their herdr socket into ~/.config/herdr/remote
+# for the board. sshd replaces a stale socket on reconnect and drops a dead link (lid shut) in ~45 s.
+mkdir -p ~/.config/herdr/remote
+printf 'StreamLocalBindUnlink yes\nClientAliveInterval 15\nClientAliveCountMax 3\n' | sudo tee /etc/ssh/sshd_config.d/20-femme-link.conf >/dev/null
+if sudo sshd -t; then sudo systemctl reload ssh; else sudo rm -f /etc/ssh/sshd_config.d/20-femme-link.conf; fi
+
 units="herdr-server herdr-notify"
 if [ -n "${BOARD_URL:-}" ]; then
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).

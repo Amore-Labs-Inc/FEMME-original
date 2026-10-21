@@ -278,9 +278,19 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
         }
         // Terminals on this box (herdr workspaces): list, open, close, read, type into.
         // Issue chat uses the same routes through the issue's pane. herdr runs as this same
-        // user; arguments go straight to it, never through a shell.
+        // user; arguments go straight to it, never through a shell. Linked machines' terminals
+        // are listed too (see on_machine); new ones open here only.
         (Method::Get, ["api", "terminals"]) => match herdr(&["api", "snapshot"]) {
-            Ok(out) => ok(terminals(&out, &app.home)),
+            Ok(out) => {
+                let mut list = terminals(&out, &app.home);
+                // A sleeping laptop's link is down, so it simply isn't listed.
+                for (m, sock) in machines(&app.home) {
+                    if let Ok(out) = herdr_on(Some(&sock), &["api", "snapshot"]) {
+                        list["workspaces"].as_array_mut().unwrap().extend(workspaces(&out, Some(&m)));
+                    }
+                }
+                ok(list)
+            }
             Err(e) => err(502, &e),
         },
         (Method::Post, ["api", "terminals"]) => {
@@ -305,17 +315,20 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             }
             ok(json!({"pane_id": pane}))
         }
-        (Method::Delete, ["api", "terminals", ws]) if valid_id(ws, false) => {
-            herdr(&["workspace", "close", ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+        (Method::Delete, ["api", "terminals", ws]) => {
+            let Some((sock, ws)) = on_machine(&app.home, ws, false) else { return err(404, "not found") };
+            herdr_on(sock.as_deref(), &["workspace", "close", ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
         }
         // The browser terminal: the pane's screen with its colours, and raw keystrokes back.
-        (Method::Get, ["api", "terminals", pane, "screen"]) if valid_id(pane, true) => {
-            match herdr(&["pane", "read", pane, "--source", "visible", "--format", "ansi"]) {
-                Ok(screen) => ok(json!({"screen": screen, "status": pane_status(pane)})),
+        (Method::Get, ["api", "terminals", pane, "screen"]) => {
+            let Some((sock, pane)) = on_machine(&app.home, pane, true) else { return err(404, "not found") };
+            match herdr_on(sock.as_deref(), &["pane", "read", pane, "--source", "visible", "--format", "ansi"]) {
+                Ok(screen) => ok(json!({"screen": screen, "status": pane_status(sock.as_deref(), pane)})),
                 Err(e) => err(404, &e),
             }
         }
-        (Method::Post, ["api", "terminals", pane, "input"]) if valid_id(pane, true) => {
+        (Method::Post, ["api", "terminals", pane, "input"]) => {
+            let Some((sock, pane)) = on_machine(&app.home, pane, true) else { return err(404, "not found") };
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
             // An argument can't hold NUL, and must stay under the kernel's 128 KiB per-argument cap.
             let data = input["data"].as_str().unwrap_or("").replace('\0', "");
@@ -323,7 +336,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                 return err(400, "send 1 to 100000 bytes");
             }
             // herdr takes the text verbatim, even when it starts with a dash, so no `--` (it would be typed).
-            herdr(&["pane", "send-text", pane, &data]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+            herdr_on(sock.as_deref(), &["pane", "send-text", pane, &data]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
         }
         // A pasted or dropped file lands in <state>/uploads; the page then types its path into
         // the terminal, which Claude Code turns into an attached image.
@@ -473,8 +486,8 @@ fn valid_id(id: &str, pane: bool) -> bool {
 }
 
 /// The agent status of a pane, or None if it is a plain shell.
-fn pane_status(pane: &str) -> Option<String> {
-    let v: Value = serde_json::from_str(&herdr(&["agent", "get", pane]).ok()?).ok()?;
+fn pane_status(sock: Option<&Path>, pane: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(&herdr_on(sock, &["agent", "get", pane]).ok()?).ok()?;
     v["result"]["agent"]["agent_status"].as_str().map(String::from)
 }
 
@@ -491,12 +504,43 @@ fn wait_for_shell(pane: &str) {
     }
 }
 
-/// Workspaces with their panes, plus folders you can open a new terminal in.
-fn terminals(snapshot: &str, home: &Path) -> Value {
+/// Another machine (a laptop running systemd/femme-link.service) lends the board its herdr: SSH
+/// forwards its socket to <home>/.config/herdr/remote/<machine>.sock. Its ids carry the machine,
+/// `Omarchy~w1:p1`. Returns the socket to use (None: this box) and the id on that machine.
+fn on_machine<'a>(home: &Path, id: &'a str, pane: bool) -> Option<(Option<PathBuf>, &'a str)> {
+    let (sock, id) = match id.split_once('~') {
+        None => (None, id),
+        Some((m, id)) => (Some(machine_socket(home, m)?), id),
+    };
+    valid_id(id, pane).then_some((sock, id))
+}
+
+fn machine_socket(home: &Path, name: &str) -> Option<PathBuf> {
+    let ok = name.len() < 64 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    (ok && !name.is_empty()).then(|| home.join(".config/herdr/remote").join(format!("{name}.sock")))
+}
+
+fn machines(home: &Path) -> Vec<(String, PathBuf)> {
+    let mut list: Vec<(String, PathBuf)> = fs::read_dir(home.join(".config/herdr/remote"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|f| {
+            let name = f.file_name().to_string_lossy().strip_suffix(".sock")?.to_string();
+            Some((name.clone(), machine_socket(home, &name)?))
+        })
+        .collect();
+    list.sort();
+    list
+}
+
+/// A machine's workspaces with their panes, ids tagged with the machine when it isn't this box.
+fn workspaces(snapshot: &str, machine: Option<&str>) -> Vec<Value> {
+    let tag = |id: &str| machine.map_or(id.to_string(), |m| format!("{m}~{id}"));
     let snap: Value = serde_json::from_str(snapshot).unwrap_or_default();
     let snap = &snap["result"]["snapshot"];
     let panes = snap["panes"].as_array().cloned().unwrap_or_default();
-    let workspaces: Vec<Value> = snap["workspaces"]
+    snap["workspaces"]
         .as_array()
         .cloned()
         .unwrap_or_default()
@@ -507,13 +551,18 @@ fn terminals(snapshot: &str, home: &Path) -> Value {
                 .iter()
                 .filter(|p| text(p, "workspace_id") == id)
                 .map(|p| {
-                    json!({"pane_id": p["pane_id"], "agent": p["agent"], "status": p["agent_status"],
+                    json!({"pane_id": tag(text(p, "pane_id")), "agent": p["agent"], "status": p["agent_status"],
                            "cwd": p["foreground_cwd"].as_str().or(p["cwd"].as_str()), "title": p["terminal_title_stripped"]})
                 })
                 .collect();
-            json!({"workspace_id": id, "label": w["label"], "status": w["agent_status"], "panes": ps})
+            json!({"workspace_id": tag(&id), "machine": machine, "label": w["label"], "status": w["agent_status"], "panes": ps})
         })
-        .collect();
+        .collect()
+}
+
+/// This box's workspaces, plus folders you can open a new terminal in.
+fn terminals(snapshot: &str, home: &Path) -> Value {
+    let workspaces = workspaces(snapshot, None);
     let mut folders = vec![home.display().to_string()];
     for base in ["Documents", "femme-work"] {
         for d in fs::read_dir(home.join(base)).into_iter().flatten().flatten() {
@@ -563,7 +612,17 @@ fn clean_name(name: &str) -> String {
 }
 
 fn herdr(args: &[&str]) -> Result<String, String> {
-    let out = std::process::Command::new("herdr").args(args).output().map_err(|e| format!("herdr: {e}"))?;
+    herdr_on(None, args)
+}
+
+/// herdr on a linked machine goes through its forwarded socket, under `timeout`: a link that
+/// died without closing (a laptop gone to sleep) would otherwise hold up the whole board.
+fn herdr_on(sock: Option<&Path>, args: &[&str]) -> Result<String, String> {
+    let mut cmd = Command::new(if sock.is_some() { "timeout" } else { "herdr" });
+    if let Some(sock) = sock {
+        cmd.args(["5", "herdr"]).env("HERDR_SOCKET_PATH", sock);
+    }
+    let out = cmd.args(args).output().map_err(|e| format!("herdr: {e}"))?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
@@ -747,6 +806,14 @@ mod tests {
         }
         for bad in ["w9", "w9:", ":p1", "w9:p1;rm", "w9:p1:p2", "w9:p", "x9:p1"] {
             assert!(!valid_id(bad, true), "{bad} is not a pane");
+        }
+        let home = Path::new("/h");
+        assert_eq!(on_machine(home, "w9:p1", true), Some((None, "w9:p1")));
+        let sock = Some(PathBuf::from("/h/.config/herdr/remote/Omarchy.sock"));
+        assert_eq!(on_machine(home, "Omarchy~w9:p1", true), Some((sock.clone(), "w9:p1")));
+        assert_eq!(on_machine(home, "Omarchy~w9", false), Some((sock, "w9")));
+        for bad in ["~w9:p1", "../x~w9:p1", "a/b~w9:p1", "a b~w9:p1", "a~b~w9:p1", "Omarchy~w9", "Omarchy~"] {
+            assert_eq!(on_machine(home, bad, true), None, "{bad} is not a linked pane");
         }
     }
 

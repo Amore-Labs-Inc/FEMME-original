@@ -367,12 +367,11 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
         }
         (Method::Post, ["api", "accounts", kind @ ("claude" | "aws"), "code"]) => {
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
-            let code = input["code"].as_str().unwrap_or("").trim();
-            if code.is_empty() || code.len() > 1000 || code.chars().any(|c| c.is_whitespace() || c.is_control()) {
+            let Some(code) = sign_in_code(input["code"].as_str().unwrap_or("")) else {
                 return err(400, "paste the code exactly as the sign-in page shows it");
-            }
+            };
             let Some(mut login) = app.logins.remove(*kind) else { return err(409, "that sign-in ended; start again") };
-            let mut done = login.finish(code);
+            let mut done = login.finish(&code);
             if *kind == "claude" && done.is_ok() {
                 done = cswap(&["add"], Some(&login.dir)).map(drop);
             }
@@ -622,6 +621,13 @@ fn login_url(out: &str) -> Option<String> {
     url.contains("/authorize?").then_some(url)
 }
 
+/// The code a sign-in page shows: Claude's is short, AWS's is a few KB of base64. Copying a long
+/// one can pick up line breaks, so whitespace goes; it is written to stdin, so no control bytes.
+fn sign_in_code(s: &str) -> Option<String> {
+    let code: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+    (!code.is_empty() && code.len() <= 16_000 && !code.chars().any(char::is_control)).then_some(code)
+}
+
 fn last_line(s: &str) -> Option<&str> {
     s.lines().map(str::trim).filter(|l| !l.is_empty()).last()
 }
@@ -767,6 +773,17 @@ mod tests {
         assert_eq!(login_url(&format!("Please visit the following URL:\n\n{aws}\n\nEnter the authorization code")).as_deref(), Some(aws));
         assert_eq!(login_url("visit: https://example.com/elsewhere"), None);
         assert_eq!(login_url("Paste code here if prompted > "), None);
+    }
+
+    #[test]
+    fn sign_in_codes_long_or_wrapped() {
+        let aws = "Y29kZT1leUo2YVhBaU9pSkVSVVlp".repeat(100); // 2800 chars, like AWS's
+        assert_eq!(sign_in_code(&aws).as_deref(), Some(aws.as_str()));
+        assert_eq!(sign_in_code(" abc#def\n").as_deref(), Some("abc#def"));
+        assert_eq!(sign_in_code("abc\ndef").as_deref(), Some("abcdef"));
+        assert_eq!(sign_in_code("ab\x1bc"), None);
+        assert_eq!(sign_in_code("  "), None);
+        assert_eq!(sign_in_code(&"a".repeat(16_001)), None);
     }
 
     #[test]

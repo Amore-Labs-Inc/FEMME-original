@@ -1,0 +1,13 @@
+# Laptop side: lends this machine's herdr to the board, so its terminals show up and can be used
+# there. The VPS sees the socket as ~/.config/herdr/remote/<hostname>.sock while the laptop is awake.
+[Unit]
+Description=Link this machine's herdr to the FEMME board (socket forwarded to the VPS)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -N -o ControlMaster=no -o ControlPath=none -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -R %h/.config/herdr/remote/%l.sock:%h/.config/herdr/herdr.sock agentbox
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

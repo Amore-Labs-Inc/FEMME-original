@@ -75,6 +75,23 @@ Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point a
 - Merging to `main` deploys itself: every 20 seconds `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Set both in `.env`.
 
+### Player reports
+
+The game server files players' bug reports on the board:
+
+```
+POST /api/reports
+Authorization: Bearer <~/.local/state/femme/report.token on the VPS>
+Content-Type: application/json
+{"title": "≤120 chars, optional", "text": "1-4000 chars", "png": "<base64 PNG, ≤6 MB>", "meta": {"any": "object ≤4 KB"}}
+→ 201 {"id": <issue id>}   400 bad field · 401 bad token · 413 body over 9 MB · 429 over the hourly limit
+```
+
+- `report.token` is created at the board's first start (mode 0600). It opens this route only; the worker token and a session never do.
+- The screenshot and the report go to `~/.local/state/femme/reports/` (kept, never purged). The issue body gives the worker's Claude the screenshot's path, the meta, and the player's text fenced as untrusted data. Signed in, the card's **screenshot** link shows it.
+- Reports land as **Player reports** (status `triage`), which the worker never starts. **Queue it** moves one to the queue (`open`); **Delete** drops it.
+- `.env`: `FEMME_REPORT_REPO` (default `Darkosxl/mksm-recomp`), `FEMME_REPORT_BASE` (the branch PRs start from and target, default `shaolin-monks-decomp`), `FEMME_REPORT_LIMIT` (reports per hour, all players together, default 30).
+
 ### Accounts
 
 The board's **accounts** window lists every Claude account stored with [cswap](https://pypi.org/project/claude-swap/), with each account's 5-hour and 7-day usage.

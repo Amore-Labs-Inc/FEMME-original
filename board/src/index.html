@@ -193,7 +193,7 @@
 </div>
 <script>
   const SECTIONS = [
-    ['waiting', 'Needs you', '--pause'], ['working', 'Working', '--work'], ['paused', 'Paused', '--queue'], ['open', 'Queue', '--queue'],
+    ['waiting', 'Needs you', '--pause'], ['triage', 'Player reports', '--neon'], ['working', 'Working', '--work'], ['paused', 'Paused', '--queue'], ['open', 'Queue', '--queue'],
     ['pr', 'PR ready', '--pr'], ['failed', 'Failed', '--bad'], ['done', 'Done', '--done'],
   ];
   const $ = id => document.getElementById(id);
@@ -209,6 +209,7 @@
     const acts = [];
     if (i.pane && ['working', 'waiting', 'paused', 'pr', 'failed'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-pane="${esc(i.pane)}" data-chat="${esc(i.title)}">Chat</button>`);
     if (['paused', 'failed', 'done'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-set="open">Retry</button>`);
+    if (i.status === 'triage') acts.push(`<button data-id="${i.id}" data-set="open">Queue it</button>`);
     if (i.status === 'pr') acts.push(`<button data-id="${i.id}" data-set="done">Merged, done</button>`);
     if (!['working', 'waiting'].includes(i.status)) acts.push(`<button data-id="${i.id}" data-del>Delete</button>`);
     return `<div class="card">
@@ -216,6 +217,7 @@
       <div class="title">${esc(i.title)}</div>
       ${i.body ? `<details><summary>details</summary><div class="body">${esc(i.body)}</div></details>` : ''}
       ${i.note ? `<div class="note">${esc(i.note)}</div>` : ''}
+      ${i.report ? `<div class="note"><a href="/reports/${esc(i.report)}" target="_blank" rel="noopener">screenshot</a></div>` : ''}
       ${i.pr_url ? `<div class="note"><a href="${esc(i.pr_url)}" target="_blank" rel="noopener">${esc(i.pr_url)}</a></div>` : ''}
       ${acts.length ? `<div class="actions">${acts.join('')}</div>` : ''}
     </div>`;
@@ -227,6 +229,7 @@
       const rows = issues.filter(i => i.status === key).sort((a, b) => key === 'open' ? a.id - b.id : (b.updated || 0) - (a.updated || 0));
       const bar = `<h2 class="tb"><b style="background:var(${color})"></b>${label}${rows.length ? ` (${rows.length})` : ''}</h2>`;
       const cards = rows.length ? rows.map(card).join('') : '<div class="empty">nothing here</div>';
+      if (key === 'triage' && !rows.length) return '';  // shown only while reports wait for you
       if (key === 'done' && rows.length) return `<details class="win"><summary>${bar}</summary><div class="frame">${cards}</div></details>`;
       return `<section class="win">${bar}<div class="frame">${cards}</div></section>`;
     }).join('');

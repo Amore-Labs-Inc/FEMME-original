@@ -37,6 +37,24 @@ mkdir -p ~/.config/herdr/remote
 printf 'StreamLocalBindUnlink yes\nClientAliveInterval 15\nClientAliveCountMax 3\n' | sudo tee /etc/ssh/sshd_config.d/20-femme-link.conf >/dev/null
 if sudo sshd -t; then sudo systemctl reload ssh; else sudo rm -f /etc/ssh/sshd_config.d/20-femme-link.conf; fi
 
+# `pc` (pc.sh): agents here build and test on the laptop, in the same synced folder, over that
+# same link (it also forwards the laptop's sshd as <hostname>.ssh; pc-setup.sh on the laptop).
+[ -f ~/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C femme-vps
+pc_host=${PC_HOST:-$(cd ~/.config/herdr/remote && ls *.sock 2>/dev/null | sed 's/\.sock$//' || :)}
+case $pc_host in
+  '') echo "NOTE: no linked laptop yet, so no 'Host pc': run pc-setup.sh on it (or set PC_HOST in .env)" >&2 ;;
+  *$'\n'*) echo "WARN: several laptops are linked: set PC_HOST in .env to the one pc should use" >&2 ;;
+  *) { [ -f ~/.ssh/config ] && sed '/^# femme pc start$/,/^# femme pc end$/d' ~/.ssh/config
+       printf '# femme pc start\nHost pc\n  ProxyCommand nc -U %s/.config/herdr/remote/%s.ssh\n  User %s\n  IdentityFile ~/.ssh/id_ed25519\n  IdentitiesOnly yes\n  ControlMaster auto\n  ControlPath ~/.ssh/cm-pc\n  ControlPersist 10m\n  ServerAliveInterval 15\n  ServerAliveCountMax 2\n  ConnectTimeout 5\n  StrictHostKeyChecking accept-new\n# femme pc end\n' "$HOME" "$pc_host" "$(id -un)"
+     } > ~/.ssh/config.new && mv ~/.ssh/config.new ~/.ssh/config && chmod 600 ~/.ssh/config ;;
+esac
+install -m755 pc.sh ~/.local/bin/pc
+# The same rule for every agent: Claude reads ~/.claude/rules, Codex its global ~/.codex/AGENTS.md.
+mkdir -p ~/.claude/rules && cp rules/pc.md ~/.claude/rules/femme-pc.md
+{ [ -f ~/.codex/AGENTS.md ] && sed '/^<!-- femme pc start -->$/,/^<!-- femme pc end -->$/d' ~/.codex/AGENTS.md
+  printf '<!-- femme pc start -->\n'; cat rules/pc.md; printf '<!-- femme pc end -->\n'
+} > ~/.codex/AGENTS.new && mv ~/.codex/AGENTS.new ~/.codex/AGENTS.md
+
 units="herdr-server herdr-notify"
 if [ -n "${BOARD_URL:-}" ]; then
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).

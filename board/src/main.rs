@@ -294,7 +294,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
     let caller = app.keys.iter().find(|k| !key.is_empty() && same(text(k, "key").as_bytes(), key.as_bytes())).cloned();
     if caller.is_some() {
         if !api_route(&method, &parts) {
-            return err(403, "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name} and /api/terminals/{pane}/input");
+            return err(403, "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name}, its /push and /discard, and /api/terminals/{pane}/input");
         }
     } else if !signed_in(req, app) {
         return match parts.as_slice() {
@@ -316,7 +316,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             }
             let Some((pane, status)) = named_agent(name) else { return err(404, "not running") };
             let screen = herdr(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
-            let mut v = outcome(&app.home.join("femme-work").join(name), app.heads.get(*name).map(String::as_str), &status);
+            let mut v = outcome(&app.home.join("femme-work").join(name), app.heads.get(*name).map(String::as_str), &status, name);
             v["pane_id"] = pane.into();
             v["status"] = status.into();
             v["screen"] = screen.into();
@@ -339,22 +339,25 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                     Err(e) => return e,
                 },
             };
-            // Each task ends in a report file, written fresh: a reminder goes with every task, since
-            // the brief only went with the first.
-            let report = report_path(app, name);
-            let _ = fs::remove_file(&report);
-            let text = format!("{text}\n\nWhen done, write the report to {} (overwrite it), as briefed.", report.display());
-            if let Some(head) = git(&app.home.join("femme-work").join(name), &["rev-parse", "HEAD"]) {
-                app.heads.insert(name.to_string(), head);
+            send(app, name, pane, text)
+        }
+        // The owner's answer to a task's report: the changes stay uncommitted until one of these comes.
+        (Method::Post, ["api", "agents", name, verdict @ ("push" | "discard")]) => {
+            if !valid_name(name) {
+                return err(400, "name: a-z, 0-9 and -, up to 32 characters");
             }
-            match herdr(&["agent", "prompt", name, &text]) {
-                Ok(_) => {
-                    // herdr sees `working` a moment later; until then a GET would read the last task as finished.
-                    let _ = (0..10).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "working")));
-                    ok(json!({"pane_id": pane, "status": "working"}))
-                }
-                Err(e) => ok(json!({"error": e, "pane_id": pane})).with_status_code(409),
+            let Some((pane, _)) = named_agent(name) else { return err(404, "not running") };
+            let Some(branch) = git(&app.home.join("femme-work").join(name), &["rev-parse", "--abbrev-ref", "HEAD"]) else { return err(400, "this session has no repo") };
+            let note = read_json(req).ok().and_then(|v| v["text"].as_str().map(|s| s.replace('\0', ""))).unwrap_or_default();
+            if note.len() > 10_000 {
+                return err(400, "text: up to 10000 bytes");
             }
+            let note = if note.trim().is_empty() { String::new() } else { format!("\n\nNote from the owner:\n{note}") };
+            let text = match *verdict {
+                "push" => format!("Push request from the owner. Commit every change from the last task as one commit whose message says what changed and why, then git pull --rebase origin {branch} && git push origin {branch}. If there is nothing to commit, say so and push nothing.{note}"),
+                _ => format!("Discard request from the owner. Throw away every uncommitted change from the last task (git checkout -- . && git clean -fd) and say so.{note}"),
+            };
+            send(app, name, pane, text)
         }
         // Keys for other agents: made and revoked here, shown once. A key may carry a GitHub
         // account (a token pasted, or signed in with gh's device code): its clones push as it.
@@ -614,7 +617,7 @@ fn api_route(method: &Method, parts: &[&str]) -> bool {
     use Method::*;
     matches!(
         (method, parts),
-        (Get, ["api", "ping" | "openapi.json"]) | (Get | Post | Delete, ["api", "agents", _]) | (Post, ["api", "terminals", _, "input"])
+        (Get, ["api", "ping" | "openapi.json"]) | (Get | Post | Delete, ["api", "agents", _]) | (Post, ["api", "agents", _, "push" | "discard"]) | (Post, ["api", "terminals", _, "input"])
     )
 }
 
@@ -638,6 +641,30 @@ fn settle(ready: impl Fn() -> bool) -> bool {
     ready()
 }
 
+/// Sends a message to a running session. The last report goes (GET shows null until the new one
+/// is written) and a reminder about it comes with every message, since the brief only went with
+/// the first; the clone's HEAD is noted so GET can tell what the message changed.
+fn send(app: &mut App, name: &str, pane: String, text: String) -> Resp {
+    let dir = app.home.join("femme-work").join(name);
+    let report = report_path(app, name);
+    let _ = fs::remove_file(&report);
+    let mut text = format!("{text}\n\nWhen done, write the report to {} (overwrite it), as briefed.", report.display());
+    if dir.join(".git").is_dir() && !text.starts_with("Push request") {
+        text += " Do not commit or push: that comes as a separate push request.";
+    }
+    if let Some(head) = git(&dir, &["rev-parse", "HEAD"]) {
+        app.heads.insert(name.to_string(), head);
+    }
+    match herdr(&["agent", "prompt", name, &text]) {
+        Ok(_) => {
+            // herdr sees `working` a moment later; until then a GET would read the last task as finished.
+            let _ = (0..10).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "working")));
+            ok(json!({"pane_id": pane, "status": "working"}))
+        }
+        Err(e) => ok(json!({"error": e, "pane_id": pane})).with_status_code(409),
+    }
+}
+
 /// A git query in `dir`, trimmed; None when it fails (no clone there).
 fn git(dir: &Path, args: &[&str]) -> Option<String> {
     let out = Command::new("git").arg("-C").arg(dir).args(args).output().ok()?;
@@ -647,7 +674,7 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 /// What a task came to, for the caller: read off the clone's git state once Claude stopped.
 /// Pushed = clean tree with HEAD on its remote branch (a push moves origin/<branch> too, so no
 /// fetch) and HEAD moved since the task was sent (`before`; unknown after a board restart).
-fn outcome(dir: &Path, before: Option<&str>, status: &str) -> Value {
+fn outcome(dir: &Path, before: Option<&str>, status: &str, name: &str) -> Value {
     let no = |m: &str| json!({"message": m, "pushed": false});
     match status {
         "working" => return json!({"message": null, "pushed": false}),
@@ -663,30 +690,15 @@ fn outcome(dir: &Path, before: Option<&str>, status: &str) -> Value {
     let clean = git(dir, &["status", "--porcelain"]).is_some_and(|s| s.is_empty());
     let repo = git(dir, &["remote", "get-url", "origin"]).unwrap_or_default();
     let repo = repo.trim_end_matches('/').trim_end_matches(".git").rsplit(['/', ':']).next().unwrap_or("").to_string();
-    let mut v = if clean && !head.is_empty() && head == remote && before != Some(head.as_str()) {
+    if clean && !head.is_empty() && head == remote && before != Some(head.as_str()) {
         json!({"message": format!("changes created and pushed to {repo}"), "pushed": true, "commit": head})
     } else if clean && head == remote {
         no("finished, nothing new to push: read the screen")
     } else {
-        no(&format!("stopped without pushing to {branch}: read the screen"))
-    };
-    v["changes"] = changes(dir, before);
-    v
+        no(&format!("changes ready, not pushed to {branch}: read the report, then POST /api/agents/{name}/push or /discard"))
+    }
 }
 
-/// What the task changed in the clone: the commits since the task was sent, each with its
-/// message, and git's per-file summary against where it started (uncommitted work included).
-/// Null before the first task, or when nothing moved.
-fn changes(dir: &Path, before: Option<&str>) -> Value {
-    let Some(before) = before else { return Value::Null };
-    let log = git(dir, &["log", "--reverse", "--format=%H%x1f%B%x1e", &format!("{before}..HEAD")]).unwrap_or_default();
-    let commits: Vec<Value> = log.split('\x1e').filter_map(|c| c.trim().split_once('\x1f')).map(|(h, m)| json!({"commit": h, "message": m.trim()})).collect();
-    let files = git(dir, &["diff", "--stat=100", before]).unwrap_or_default();
-    if commits.is_empty() && files.is_empty() {
-        return Value::Null;
-    }
-    json!({"commits": commits, "files": files})
-}
 
 /// Where a session's Claude leaves the report of its last task, outside the clone.
 fn report_path(app: &App, name: &str) -> PathBuf {
@@ -848,12 +860,12 @@ fn open_agent(app: &App, name: &str, input: &Value, caller: Option<&Value>) -> R
     }
     let mut brief = format!("This terminal is {name}'s standing Claude Code session on the FEMME box: every message is a new task, and the session is kept between them. ");
     if !repo.is_empty() {
-        brief += &format!("The repo {repo} is cloned here on branch {push}. For each task: do it end to end, run the project's checks and tests, commit, then git pull --rebase origin {push} && git push origin {push}. Do not open PRs. ");
+        brief += &format!("The repo {repo} is cloned here on branch {push}. For each task: do it end to end and run the project's checks and tests, but do not commit and do not push: leave the changes in the working tree, the owner reads the report first and then sends a push request or a discard request. Do not open PRs. ");
     }
     brief += "If a decision is only the owner's to make, say so plainly and stop. \
         Write everything for a reader with ADHD: the point first, short lines, bullets, no paragraphs. \
-        When a task is finished, write a report to the file named at the end of the task (overwrite it) and print the same: \
-        line 1, what happened, under 15 words; then up to five bullets, each under 15 words: what changed and where (files), what was checked, what is left open or needs the owner. Nothing else.\n\nTask:\n";
+        When a task is finished, write a report to the file named at the end of the task (overwrite it) and print the same. \
+        The reader is not a programmer: line 1, what the change does for them, under 15 words; then up to five bullets, each under 15 words, on what they will notice or can now do, what was checked, and what is left open or needs their decision. No file names, no code, no jargon. Nothing else.\n\nTask:\n";
     Ok((pane, brief))
 }
 
@@ -1431,7 +1443,7 @@ mod tests {
         use Method::*;
         for (m, p) in [
             (Get, "api/ping"), (Get, "api/openapi.json"), (Get, "api/agents/instinct"), (Post, "api/agents/instinct"),
-            (Delete, "api/agents/instinct"), (Post, "api/terminals/w2:p1/input"),
+            (Delete, "api/agents/instinct"), (Post, "api/agents/instinct/push"), (Post, "api/agents/instinct/discard"), (Post, "api/terminals/w2:p1/input"),
         ] {
             assert!(api_route(&m, &p.split('/').collect::<Vec<_>>()), "{m} {p} should be open to the key");
         }
@@ -1470,29 +1482,20 @@ mod tests {
     fn outcome_reads_the_clone() {
         let dir = env::temp_dir().join(format!("femme-outcome-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
-        assert_eq!(outcome(&dir, None, "working")["message"], Value::Null);
-        assert_eq!(outcome(&dir, None, "idle")["message"], "finished: read the screen");
+        assert_eq!(outcome(&dir, None, "working", "x")["message"], Value::Null);
+        assert_eq!(outcome(&dir, None, "idle", "x")["message"], "finished: read the screen");
         // A clone whose HEAD sits on origin/main: pushed, unless it is the HEAD the task started from.
         let sh = |c: &str| assert!(Command::new("sh").arg("-c").arg(c).current_dir(&dir).output().unwrap().status.success(), "{c}");
         sh("git init -q -b main && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m x \
             && git remote add origin https://github.com/Amore-Labs-Inc/Exposure.git && git update-ref refs/remotes/origin/main HEAD");
         let head = git(&dir, &["rev-parse", "HEAD"]).unwrap();
-        let v = outcome(&dir, Some("0000"), "idle");
+        let v = outcome(&dir, Some("0000"), "idle", "x");
         assert_eq!(v["message"], "changes created and pushed to Exposure");
         assert_eq!(v["pushed"], true);
         assert_eq!(v["commit"], head);
-        assert_eq!(outcome(&dir, Some(&head), "done")["message"], "finished, nothing new to push: read the screen");
-        assert_eq!(outcome(&dir, Some(&head), "done")["changes"], Value::Null);
+        assert_eq!(outcome(&dir, Some(&head), "done", "x")["message"], "finished, nothing new to push: read the screen");
         sh("echo x > f");
-        assert_eq!(outcome(&dir, Some("0000"), "idle")["message"], "stopped without pushing to main: read the screen");
-        // What moved since the task was sent: the commits with their messages, and the files, uncommitted work included.
-        sh("git add f && git -c user.name=t -c user.email=t@t commit -q -m 'Add f' -m 'Because.' && echo y > g");
-        let c = changes(&dir, Some(&head));
-        assert_eq!(c["commits"][0]["message"], "Add f\n\nBecause.");
-        assert_eq!(c["commits"][0]["commit"], git(&dir, &["rev-parse", "HEAD"]).unwrap());
-        assert!(c["files"].as_str().unwrap().contains("f |"), "{c}");
-        assert_eq!(changes(&dir, None), Value::Null);
-        assert_eq!(outcome(&dir, None, "blocked")["message"], "waiting for an answer: read the screen");
+        assert_eq!(outcome(&dir, Some("0000"), "idle", "x")["message"], "changes ready, not pushed to main: read the report, then POST /api/agents/x/push or /discard");
         let _ = fs::remove_dir_all(&dir);
     }
 

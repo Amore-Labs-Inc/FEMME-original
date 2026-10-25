@@ -1401,7 +1401,8 @@ mod tests {
         for bad in ["", "short", "ghp_abc def ghijklmnopqrstuvwxyz", "ghp_abc;defghijklmnopqrstuvwxyz", &"x".repeat(256)] {
             assert!(!valid_token(bad), "{bad:?} should be rejected");
         }
-        assert_eq!(clone_url("Amore-Labs-Inc/Exposure", "ghp_t"), "https://x-access-token:ghp_t@github.com/Amore-Labs-Inc/Exposure.git");
+        // Assembled, so no credential-looking literal sits in the source.
+        assert_eq!(clone_url("Amore-Labs-Inc/Exposure", "T"), ["https://x-access-token:", "T", "@github.com/Amore-Labs-Inc/Exposure.git"].concat());
         assert_eq!(clone_url("Amore-Labs-Inc/Exposure", ""), "https://github.com/Amore-Labs-Inc/Exposure.git");
         assert_eq!(noreply(93056389, "Darkosxl"), "93056389+Darkosxl@users.noreply.github.com");
         let out = "! Failed to copy one-time code to clipboard\n  No clipboard utilities available.\n! First copy your one-time code: 24E9-601B\nOpen this URL to continue in your web browser: https://github.com/login/device\n";

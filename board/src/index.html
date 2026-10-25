@@ -129,7 +129,11 @@
       <div class="card">
         <div class="row"><span class="title">API keys</span><span class="meta">another agent's standing Claude · /api/openapi.json</span></div>
         <div id="keys" class="meta"></div>
-        <form id="newkey" class="row"><input id="key-name" placeholder="name, e.g. instinct" required pattern="[a-z0-9-]{1,32}" autocomplete="off" style="flex:1"><button class="dark">+ key</button></form>
+        <form id="newkey" class="form">
+          <input id="key-name" placeholder="name, e.g. instinct" required pattern="[a-z0-9-]{1,32}" autocomplete="off">
+          <input id="key-token" type="password" placeholder="GitHub token (optional: or connect GitHub on the key after)" autocomplete="off">
+          <button class="dark">+ key</button>
+        </form>
         <div id="key-new" class="hidden"><input id="key-val" readonly><div class="meta">shown once: copy it now</div></div>
       </div>
       <form id="login" class="card form hidden">
@@ -309,9 +313,14 @@
     if (d) $('code').value = '';
   };
   $('login-x').onclick = () => accountCall(`/api/accounts/${loginKind}/login`, { method: 'DELETE' }, $('login-x'));
-  // Keys for other agents (Instinct): made here, shown once, revoked here.
+  // Keys for other agents (Instinct): made here, shown once, revoked here. "connect GitHub" puts
+  // that person's account on the key: gh shows a code, they enter it at github.com/login/device.
   const showKeys = ks => $('keys').innerHTML = ks.length
-    ? ks.map(k => `<span>${esc(k.name)} · …${esc(k.hint)} · ${ago(k.created)}</span><button data-revoke="${esc(k.name)}">revoke</button>`).join('')
+    ? ks.map(k => `<span>${esc(k.name)} · …${esc(k.hint)} · pushes as ${esc(k.account)} · ${ago(k.created)}${k.error ? ` · <span class="err">${esc(k.error)}</span>` : ''}</span>`
+      + (k.github
+        ? `<span>the account that should push enters <b>${esc(k.github.code)}</b> at <a href="${esc(k.github.url)}" target="_blank" rel="noopener noreferrer">github.com/login/device</a></span><button data-gh-x="${esc(k.name)}">cancel</button>`
+        : `<button data-gh="${esc(k.name)}">connect GitHub</button>`)
+      + `<button data-revoke="${esc(k.name)}">revoke</button>`).join('')
     : '<span>no keys yet</span>';
   async function keyCall(url, opts, busy) {
     $('acct-err').textContent = '';
@@ -324,16 +333,20 @@
   }
   $('newkey').onsubmit = async e => {
     e.preventDefault();
-    const d = await keyCall('/api/keys', { method: 'POST', body: JSON.stringify({ name: $('key-name').value.trim() }) }, e.submitter);
+    const body = { name: $('key-name').value.trim(), github_token: $('key-token').value.trim() };
+    const d = await keyCall('/api/keys', { method: 'POST', body: JSON.stringify(body) }, e.submitter);
     if (!d) return;
-    $('key-name').value = '';
+    $('newkey').reset();
     $('key-val').value = d.key;
     $('key-new').classList.remove('hidden');
     $('key-val').select();
   };
   $('keys').onclick = e => {
-    const b = e.target.closest('[data-revoke]');
-    if (b && confirm(`Revoke key ${b.dataset.revoke}? Whatever uses it stops working.`)) keyCall(`/api/keys/${b.dataset.revoke}`, { method: 'DELETE' }, b);
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.gh) keyCall(`/api/keys/${b.dataset.gh}/github`, { method: 'POST', body: '{}' }, b);
+    else if (b.dataset.ghX) keyCall(`/api/keys/${b.dataset.ghX}/github`, { method: 'DELETE' }, b);
+    else if (b.dataset.revoke && confirm(`Revoke key ${b.dataset.revoke}? Whatever uses it stops working.`)) keyCall(`/api/keys/${b.dataset.revoke}`, { method: 'DELETE' }, b);
   };
 
   $('deploy-x').onclick = async () => { await api('/api/deploy', { method: 'DELETE' }); $('deploy').classList.add('hidden'); };

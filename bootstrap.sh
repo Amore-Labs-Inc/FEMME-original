@@ -46,7 +46,31 @@ if [ -n "${BOARD_URL:-}" ]; then
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).
   command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }
   # encode: the browser terminal polls the screen several times a second; compressed it is ~5x smaller.
-  printf '%s {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:8787\n}\n' "${BOARD_URL#https://}" | sudo tee /etc/caddy/Caddyfile >/dev/null
+  # timeouts: the board takes one request at a time, so a client trickling a body may hold it 60 s, not forever.
+  # max_size: a 20 MB upload, base64'd. Headers: HSTS; no Referer, the magic link's token is in its URL.
+  sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
+{
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 60s
+		}
+	}
+}
+${BOARD_URL#https://} {
+	encode zstd gzip
+	request_body {
+		max_size 30MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		Referrer-Policy no-referrer
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+	}
+	reverse_proxy 127.0.0.1:8787
+}
+EOF
   sudo systemctl reload-or-restart caddy
   # Built here, not on the laptop, so a merge to main can deploy itself (deploy.sh).
   [ -x ~/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --no-modify-path

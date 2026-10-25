@@ -49,7 +49,7 @@ struct App {
     issues: Vec<Value>,
     sessions: HashMap<String, u64>, // token -> expiry; persisted so restarts don't log you out
     links: HashMap<String, u64>,    // token -> expiry; memory only, 15 minutes is short anyway
-    last_mail: u64,
+    last_mail: HashMap<String, u64>, // client IP -> when it last got a link; memory only
     worker_token: String,
     keys: Vec<Value>,                // other agents' keys, made on the board: {name, key, created}
     keys_path: PathBuf,
@@ -182,7 +182,7 @@ fn main() {
         issues: load(&dir.join("issues.json")).unwrap_or_default(),
         sessions: load(&dir.join("sessions.json")).unwrap_or_default(),
         links: HashMap::new(),
-        last_mail: 0,
+        last_mail: HashMap::new(),
         worker_token: load_token(&dir.join("worker.token")),
         keys: load(&dir.join("api-keys.json")).unwrap_or_default(),
         keys_path: dir.join("api-keys.json"),
@@ -219,6 +219,9 @@ fn main() {
     let addr = env::var("FEMME_BOARD_ADDR").unwrap_or_else(|_| "127.0.0.1:8787".into());
     let server = Server::http(&addr).expect("cannot bind");
     eprintln!("femme-board on http://{addr} for {}, data in {}", app.url, dir.display());
+    // ponytail: one request at a time, bodies read in here. Caddy's read_body timeout (bootstrap.sh)
+    // bounds how long a slow client holds everyone up; if that ever hurts, read bodies on a thread
+    // per request and hand this loop finished requests.
     for mut req in server.incoming_requests() {
         let resp = route(&mut req, &mut app);
         let _ = req.respond(resp);
@@ -244,14 +247,23 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             let input = read_json(req).unwrap_or_default();
             let asked = input["email"].as_str().unwrap_or("").trim().to_lowercase();
             // Same answer either way, so the page never reveals which address is allowed.
-            if app.emails.contains(&asked) && now() >= app.last_mail + 60 {
-                app.last_mail = now();
+            // One link a minute per client (Caddy's X-Forwarded-For), five in all: a stranger posting
+            // an owner's address neither keeps the owner from a link nor floods the inbox.
+            let ip = client_ip(req);
+            app.last_mail.retain(|_, t| *t + 60 > now());
+            if app.emails.contains(&asked) && !app.last_mail.contains_key(&ip) && app.last_mail.len() < 5 {
+                app.last_mail.insert(ip, now());
                 let token = random_hex();
                 app.links.retain(|_, exp| *exp > now());
                 app.links.insert(token.clone(), now() + LINK_SECS);
-                if let Err(e) = send_link(app, &asked, &format!("{}/magic/{token}", app.url)) {
-                    eprintln!("sign-in mail failed: {e}");
-                }
+                // Off this thread: the answer takes the same time whichever address was asked, and
+                // Resend's round trip holds up nobody.
+                let (key, from, link) = (app.resend_key.clone(), app.from.clone(), format!("{}/magic/{token}", app.url));
+                thread::spawn(move || {
+                    if let Err(e) = send_link(&key, &from, &asked, &link) {
+                        eprintln!("sign-in mail failed: {e}");
+                    }
+                });
             }
             return ok(json!({"ok": true}));
         }
@@ -846,7 +858,7 @@ fn open_agent(app: &App, name: &str, input: &Value, caller: Option<&Value>) -> R
 }
 
 fn signed_in(req: &Request, app: &App) -> bool {
-    if header(req, "Authorization") == format!("Bearer {}", app.worker_token) {
+    if same(header(req, "Authorization").as_bytes(), format!("Bearer {}", app.worker_token).as_bytes()) {
         return true;
     }
     session_cookie(req).and_then(|t| app.sessions.get(&t).copied()).is_some_and(|exp| exp > now())
@@ -1000,6 +1012,16 @@ fn same(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| std::hint::black_box(acc | (x ^ y))) == 0
 }
 
+/// The client as Caddy saw it: the last X-Forwarded-For entry (the one Caddy appends; anything
+/// before it is the client's own word), else the socket's peer (a local caller).
+fn client_ip(req: &Request) -> String {
+    let xff = header(req, "X-Forwarded-For");
+    match xff.rsplit(',').next().map(str::trim).filter(|s| !s.is_empty()) {
+        Some(ip) => ip.to_string(),
+        None => req.remote_addr().map(|a| a.ip().to_string()).unwrap_or_default(),
+    }
+}
+
 fn session_cookie(req: &Request) -> Option<String> {
     header(req, "Cookie")
         .split(';')
@@ -1014,20 +1036,20 @@ fn cookie(app: &App, value: &str, max_age: u64) -> Header {
     Header::from_bytes("Set-Cookie", c).unwrap()
 }
 
-fn send_link(app: &App, to: &str, link: &str) -> Result<(), String> {
-    if app.resend_key.is_empty() {
+fn send_link(key: &str, from: &str, to: &str, link: &str) -> Result<(), String> {
+    if key.is_empty() {
         eprintln!("sign-in link: {link}");
         return Ok(());
     }
     let body = json!({
-        "from": app.from,
+        "from": from,
         "to": [to],
         "subject": "Sign in to FEMME",
         "text": format!("Sign in to your FEMME board (valid 15 minutes, once):\n\n{link}\n"),
         "html": format!(r#"<p>Sign in to your FEMME board (valid 15 minutes, once):</p><p><a href="{link}">Sign in to FEMME</a></p>"#),
     });
     ureq::post("https://api.resend.com/emails")
-        .set("Authorization", &format!("Bearer {}", app.resend_key))
+        .set("Authorization", &format!("Bearer {key}"))
         .set("Content-Type", "application/json")
         .send_string(&body.to_string())
         .map(|_| ())
@@ -1607,5 +1629,16 @@ mod tests {
             assert!(!report_file(bad), "{bad} is not a report file");
         }
         assert!(same(b"abc", b"abc") && !same(b"abc", b"abd") && !same(b"abc", b"ab") && !same(b"", b"a"));
+    }
+
+    #[test]
+    fn client_ip_is_the_proxys_word() {
+        use tiny_http::TestRequest;
+        let peer: std::net::SocketAddr = "127.0.0.1:9".parse().unwrap();
+        let xff = |v: &str| Request::from(TestRequest::new().with_remote_addr(peer).with_header(Header::from_bytes("X-Forwarded-For", v).unwrap()));
+        assert_eq!(client_ip(&xff("1.2.3.4")), "1.2.3.4");
+        assert_eq!(client_ip(&xff("9.9.9.9, 1.2.3.4")), "1.2.3.4"); // the client's own header comes first
+        assert_eq!(client_ip(&xff(" , ")), "127.0.0.1");
+        assert_eq!(client_ip(&Request::from(TestRequest::new().with_remote_addr(peer))), "127.0.0.1");
     }
 }

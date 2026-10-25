@@ -4,6 +4,8 @@
 //! The worker (worker.sh) uses the same API with the bearer token in <state>/worker.token.
 //! The game server files player bug reports (POST /api/reports) with its own token in
 //! <state>/report.token, which opens that one route and nothing else.
+//! Another agent (Instinct) keeps one standing Claude here, by name, through /api/agents/{name}
+//! with a key made on the board (<state>/api-keys.json); GET /api/openapi.json describes that for it.
 //! Claude accounts on the box are cswap's: the board lists, switches and adds them. It also signs
 //! the box's AWS CLI in.
 
@@ -25,6 +27,7 @@ use tiny_http::{Header, Method, Request, Response, Server};
 const PAGE: &str = include_str!("index.html");
 const LOGIN: &str = include_str!("login.html");
 const LOGO: &str = include_str!("logo.svg"); // also the favicon
+const OPENAPI: &str = include_str!("openapi.json"); // the API as another agent reads it
 const MAX_BODY: u64 = 1 << 20;
 const MAX_UPLOAD: u64 = 20 << 20; // a pasted screenshot or file, before base64
 const UPLOAD_DAYS: u64 = 7;
@@ -48,6 +51,9 @@ struct App {
     links: HashMap<String, u64>,    // token -> expiry; memory only, 15 minutes is short anyway
     last_mail: u64,
     worker_token: String,
+    keys: Vec<Value>,                // other agents' keys, made on the board: {name, key, created}
+    keys_path: PathBuf,
+    heads: HashMap<String, String>, // agent name -> its clone's HEAD when its last task was sent
     report_token: String,
     report_repo: String,  // FEMME_REPORT_REPO: where player reports are filed, never from the request
     report_base: String,  // FEMME_REPORT_BASE: the branch their PRs start from and target
@@ -158,6 +164,9 @@ fn main() {
         links: HashMap::new(),
         last_mail: 0,
         worker_token: load_token(&dir.join("worker.token")),
+        keys: load(&dir.join("api-keys.json")).unwrap_or_default(),
+        keys_path: dir.join("api-keys.json"),
+        heads: HashMap::new(),
         report_token: load_token(&dir.join("report.token")),
         report_repo: or(var("FEMME_REPORT_REPO"), "Darkosxl/mksm-recomp"),
         report_base: or(var("FEMME_REPORT_BASE"), "shaolin-monks-decomp"),
@@ -247,7 +256,14 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
         _ => {}
     }
 
-    if !signed_in(req, app) {
+    // Another agent's key opens the routes in api_route and nothing else.
+    let auth = header(req, "Authorization");
+    let key = auth.strip_prefix("Bearer ").unwrap_or("");
+    if !key.is_empty() && app.keys.iter().any(|k| same(text(k, "key").as_bytes(), key.as_bytes())) {
+        if !api_route(&method, &parts) {
+            return err(403, "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name} and /api/terminals/{pane}/input");
+        }
+    } else if !signed_in(req, app) {
         return match parts.as_slice() {
             ["api", ..] | ["reports", ..] => err(401, "sign in first"),
             _ => redirect("/login"),
@@ -256,6 +272,85 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
 
     match (method, parts.as_slice()) {
         (Method::Get, [""]) => html(PAGE),
+        (Method::Get, ["api", "ping"]) => ok(json!({"ok": true})),
+        (Method::Get, ["api", "openapi.json"]) => with_type(Response::from_string(OPENAPI.replace("{BOARD_URL}", &app.url)), "application/json"),
+        // One standing Claude per name (herdr agent names), kept between calls so the caller's
+        // tasks share a session instead of each opening a terminal. Opened on the first call,
+        // or again after it is gone (closed, box rebooted), with the standing brief in front.
+        (Method::Get, ["api", "agents", name]) => {
+            if !valid_name(name) {
+                return err(400, "name: a-z, 0-9 and -, up to 32 characters");
+            }
+            let Some((pane, status)) = named_agent(name) else { return err(404, "not running") };
+            let screen = herdr(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
+            let mut v = outcome(&app.home.join("femme-work").join(name), app.heads.get(*name).map(String::as_str), &status);
+            v["pane_id"] = pane.into();
+            v["status"] = status.into();
+            v["screen"] = screen.into();
+            ok(v)
+        }
+        (Method::Post, ["api", "agents", name]) => {
+            if !valid_name(name) {
+                return err(400, "name: a-z, 0-9 and -, up to 32 characters");
+            }
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let text = input["text"].as_str().unwrap_or("").replace('\0', "");
+            if text.is_empty() || text.len() > 100_000 {
+                return err(400, "text: 1 to 100000 bytes");
+            }
+            let (pane, text) = match named_agent(name) {
+                Some((pane, _)) => (pane, text),
+                None => match open_agent(app, name, &input) {
+                    Ok((pane, brief)) => (pane, format!("{brief}{text}")),
+                    Err(e) => return e,
+                },
+            };
+            if let Some(head) = git(&app.home.join("femme-work").join(name), &["rev-parse", "HEAD"]) {
+                app.heads.insert(name.to_string(), head);
+            }
+            match herdr(&["agent", "prompt", name, &text]) {
+                Ok(_) => {
+                    // herdr sees `working` a moment later; until then a GET would read the last task as finished.
+                    let _ = (0..10).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "working")));
+                    ok(json!({"pane_id": pane, "status": "working"}))
+                }
+                Err(e) => ok(json!({"error": e, "pane_id": pane})).with_status_code(409),
+            }
+        }
+        // Keys for other agents: made and revoked here, shown once.
+        (Method::Get, ["api", "keys"]) => ok(keys_public(app)),
+        (Method::Post, ["api", "keys"]) => {
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let name = text(&input, "name").trim().to_string();
+            if !valid_name(&name) {
+                return err(400, "name: a-z, 0-9 and -, up to 32 characters");
+            }
+            if app.keys.iter().any(|k| text(k, "name") == name) {
+                return err(409, "a key with that name exists: revoke it first");
+            }
+            let key = random_hex();
+            app.keys.push(json!({"name": name, "key": key, "created": now()}));
+            match write_private(&app.keys_path, &json!(app.keys).to_string()) {
+                Ok(()) => ok(json!({"name": name, "key": key, "keys": keys_public(app)})).with_status_code(201),
+                Err(e) => e,
+            }
+        }
+        (Method::Delete, ["api", "keys", name]) => {
+            let before = app.keys.len();
+            app.keys.retain(|k| text(k, "name") != *name);
+            if app.keys.len() == before {
+                return err(404, "not found");
+            }
+            write_private(&app.keys_path, &json!(app.keys).to_string()).map(|_| ok(keys_public(app))).unwrap_or_else(|e| e)
+        }
+        (Method::Delete, ["api", "agents", name]) => {
+            if !valid_name(name) {
+                return err(400, "name: a-z, 0-9 and -, up to 32 characters");
+            }
+            let Some((pane, _)) = named_agent(name) else { return err(404, "not running") };
+            let ws = pane.split(':').next().unwrap_or("").to_string();
+            herdr(&["workspace", "close", &ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+        }
         (Method::Post, ["api", "logout"]) => {
             let token = session_cookie(req).unwrap_or_default();
             app.sessions.remove(&token);
@@ -440,6 +535,134 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
         }
         _ => err(404, "not found"),
     }
+}
+
+/// What api.token may do: its own standing agents, and keys into a pane (answering a prompt).
+/// Not issues, accounts, uploads, other terminals or the page.
+fn api_route(method: &Method, parts: &[&str]) -> bool {
+    use Method::*;
+    matches!(
+        (method, parts),
+        (Get, ["api", "ping" | "openapi.json"]) | (Get | Post | Delete, ["api", "agents", _]) | (Post, ["api", "terminals", _, "input"])
+    )
+}
+
+/// An agent name the caller picks: a herdr agent name, and a folder name under femme-work.
+fn valid_name(s: &str) -> bool {
+    !s.is_empty() && s.len() <= 32 && s.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') && !s.starts_with('-')
+}
+
+/// A branch name passed on to git in the brief: `main`, `release/2.1`; never an option.
+fn valid_branch(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() < 100
+        && !s.starts_with('-')
+        && !s.contains("..")
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+}
+
+/// Half a second, then `ready`: for the short waits on herdr noticing an agent's state.
+fn settle(ready: impl Fn() -> bool) -> bool {
+    thread::sleep(Duration::from_millis(500));
+    ready()
+}
+
+/// A git query in `dir`, trimmed; None when it fails (no clone there).
+fn git(dir: &Path, args: &[&str]) -> Option<String> {
+    let out = Command::new("git").arg("-C").arg(dir).args(args).output().ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+/// What a task came to, for the caller: read off the clone's git state once Claude stopped.
+/// Pushed = clean tree with HEAD on its remote branch (a push moves origin/<branch> too, so no
+/// fetch) and HEAD moved since the task was sent (`before`; unknown after a board restart).
+fn outcome(dir: &Path, before: Option<&str>, status: &str) -> Value {
+    let no = |m: &str| json!({"message": m, "pushed": false});
+    match status {
+        "working" => return json!({"message": null, "pushed": false}),
+        "blocked" => return no("waiting for an answer: read the screen"),
+        _ => {}
+    }
+    if !dir.join(".git").is_dir() {
+        return no("finished: read the screen");
+    }
+    let head = git(dir, &["rev-parse", "HEAD"]).unwrap_or_default();
+    let branch = git(dir, &["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
+    let remote = git(dir, &["rev-parse", &format!("origin/{branch}")]).unwrap_or_default();
+    let clean = git(dir, &["status", "--porcelain"]).is_some_and(|s| s.is_empty());
+    let repo = git(dir, &["remote", "get-url", "origin"]).unwrap_or_default();
+    let repo = repo.trim_end_matches('/').trim_end_matches(".git").rsplit(['/', ':']).next().unwrap_or("").to_string();
+    if clean && !head.is_empty() && head == remote && before != Some(head.as_str()) {
+        json!({"message": format!("changes created and pushed to {repo}"), "pushed": true, "commit": head})
+    } else if clean && head == remote {
+        no("finished, nothing new to push: read the screen")
+    } else {
+        no(&format!("stopped without pushing to {branch}: read the screen"))
+    }
+}
+
+/// The keys without their secret: name, when, and the last 4 characters to tell them apart.
+fn keys_public(app: &App) -> Value {
+    Value::Array(app.keys.iter().map(|k| json!({"name": k["name"], "created": k["created"], "hint": text(k, "key").chars().rev().take(4).collect::<String>().chars().rev().collect::<String>()})).collect())
+}
+
+/// The pane and status of the herdr agent called `name`, if it is running.
+fn named_agent(name: &str) -> Option<(String, String)> {
+    let v: Value = serde_json::from_str(&herdr(&["agent", "get", name]).ok()?).ok()?;
+    let a = &v["result"]["agent"];
+    Some((a["pane_id"].as_str()?.to_string(), text(a, "agent_status").to_string()))
+}
+
+/// Opens a workspace and starts Claude in it under `name`. `repo` (owner/name) is cloned to
+/// ~/femme-work/<name> on first use and becomes the folder; otherwise `cwd` (under home), else
+/// home. Returns the pane and the brief that goes in front of the first message: the session's
+/// standing orders, with `push` (default main) the branch each finished task lands on.
+fn open_agent(app: &App, name: &str, input: &Value) -> Result<(String, String), Resp> {
+    let repo = text(input, "repo").trim();
+    let push = input["push"].as_str().unwrap_or("main");
+    if !valid_branch(push) {
+        return Err(err(400, "push must be a branch name, like main"));
+    }
+    let dir = if repo.is_empty() {
+        home_dir(&app.home, text(input, "cwd")).ok_or_else(|| err(400, "cwd must be an existing folder inside home (or give repo)"))?
+    } else {
+        if !valid_repo(repo) {
+            return Err(err(400, "repo must look like owner/name"));
+        }
+        let dir = app.home.join("femme-work").join(name);
+        if !dir.join(".git").is_dir() {
+            let _ = fs::create_dir_all(dir.parent().unwrap());
+            let out = Command::new("gh").args(["repo", "clone", repo]).arg(&dir).args(["--", "--quiet"]).output();
+            if !out.as_ref().is_ok_and(|o| o.status.success()) {
+                return Err(err(502, &format!("could not clone {repo}")));
+            }
+        }
+        dir.display().to_string()
+    };
+    let out = herdr(&["workspace", "create", "--cwd", &dir, "--label", name, "--no-focus"]).map_err(|e| err(502, &e))?;
+    let pane = serde_json::from_str::<Value>(&out).ok().map(|v| text(&v["result"]["root_pane"], "pane_id").to_string()).unwrap_or_default();
+    if pane.is_empty() {
+        return Err(err(502, "herdr could not open a workspace"));
+    }
+    wait_for_shell(&pane);
+    if let Err(e) = herdr(&["agent", "start", name, "--kind", "claude", "--pane", &pane, "--timeout", "60000"]) {
+        // Claude's "do you trust this folder?" on its first visit: the folder is the caller's own
+        // clone (or choice), so yes; then Claude finishes starting and herdr picks it up by name.
+        let screen = herdr(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
+        let trusted = screen.contains("trust this folder")
+            && herdr(&["pane", "send-keys", &pane, "down", "enter"]).is_ok()
+            && (0..60).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "idle")));
+        if !trusted {
+            let _ = herdr(&["workspace", "close", pane.split(':').next().unwrap_or("")]);
+            return Err(err(502, &format!("Claude did not start: {e}")));
+        }
+    }
+    let mut brief = format!("This terminal is {name}'s standing Claude Code session on the FEMME box: every message is a new task, and the session is kept between them. ");
+    if !repo.is_empty() {
+        brief += &format!("The repo {repo} is cloned here on branch {push}. For each task: do it end to end, run the project's checks and tests, commit, then git pull --rebase origin {push} && git push origin {push}. Do not open PRs. ");
+    }
+    brief += "If a decision is only the owner's to make, say so plainly and stop. When a task is finished, say so in one line.\n\nTask:\n";
+    Ok((pane, brief))
 }
 
 fn signed_in(req: &Request, app: &App) -> bool {
@@ -998,6 +1221,77 @@ mod tests {
         assert_eq!(on_machine(home, "Omarchy~w9", false), Some((sock, "w9")));
         for bad in ["~w9:p1", "../x~w9:p1", "a/b~w9:p1", "a b~w9:p1", "a~b~w9:p1", "Omarchy~w9", "Omarchy~"] {
             assert_eq!(on_machine(home, bad, true), None, "{bad} is not a linked pane");
+        }
+    }
+
+    #[test]
+    fn api_key_reaches_its_agents_only() {
+        use Method::*;
+        for (m, p) in [
+            (Get, "api/ping"), (Get, "api/openapi.json"), (Get, "api/agents/instinct"), (Post, "api/agents/instinct"),
+            (Delete, "api/agents/instinct"), (Post, "api/terminals/w2:p1/input"),
+        ] {
+            assert!(api_route(&m, &p.split('/').collect::<Vec<_>>()), "{m} {p} should be open to the key");
+        }
+        for (m, p) in [
+            (Get, ""), (Get, "api/issues"), (Post, "api/issues"), (Get, "api/accounts"), (Post, "api/accounts/switch"),
+            (Post, "api/accounts/claude/login"), (Get, "api/terminals"), (Post, "api/terminals"), (Delete, "api/terminals/w2"),
+            (Get, "api/terminals/w2:p1/screen"), (Post, "api/terminals/upload"), (Get, "api/meta"), (Delete, "api/deploy"),
+            (Post, "api/logout"), (Get, "reports/x.png"), (Patch, "api/agents/instinct"), (Get, "api/keys"), (Post, "api/keys"),
+            (Delete, "api/keys/instinct"),
+        ] {
+            assert!(!api_route(&m, &p.split('/').collect::<Vec<_>>()), "{m} {p} should be closed to the key");
+        }
+    }
+
+    #[test]
+    fn outcome_reads_the_clone() {
+        let dir = env::temp_dir().join(format!("femme-outcome-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        assert_eq!(outcome(&dir, None, "working")["message"], Value::Null);
+        assert_eq!(outcome(&dir, None, "idle")["message"], "finished: read the screen");
+        // A clone whose HEAD sits on origin/main: pushed, unless it is the HEAD the task started from.
+        let sh = |c: &str| assert!(Command::new("sh").arg("-c").arg(c).current_dir(&dir).output().unwrap().status.success(), "{c}");
+        sh("git init -q -b main && git -c user.name=t -c user.email=t@t commit -q --allow-empty -m x \
+            && git remote add origin https://github.com/Amore-Labs-Inc/Exposure.git && git update-ref refs/remotes/origin/main HEAD");
+        let head = git(&dir, &["rev-parse", "HEAD"]).unwrap();
+        let v = outcome(&dir, Some("0000"), "idle");
+        assert_eq!(v["message"], "changes created and pushed to Exposure");
+        assert_eq!(v["pushed"], true);
+        assert_eq!(v["commit"], head);
+        assert_eq!(outcome(&dir, Some(&head), "done")["message"], "finished, nothing new to push: read the screen");
+        sh("echo x > f");
+        assert_eq!(outcome(&dir, Some("0000"), "idle")["message"], "stopped without pushing to main: read the screen");
+        assert_eq!(outcome(&dir, None, "blocked")["message"], "waiting for an answer: read the screen");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn names_and_branches_are_plain() {
+        for good in ["instinct", "onur-2", "a"] {
+            assert!(valid_name(good), "{good}");
+        }
+        for bad in ["", "-x", "Instinct", "a b", "a/b", "a;b", "..", &"x".repeat(33)] {
+            assert!(!valid_name(bad), "{bad} should be rejected");
+        }
+        for good in ["main", "release/2.1", "feat_x-1", "v1.0"] {
+            assert!(valid_branch(good), "{good}");
+        }
+        for bad in ["", "-f", "--force", "a..b", "a b", "a;b", "$(x)", "a/.git/../b", &"x".repeat(100)] {
+            assert!(!valid_branch(bad), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn openapi_is_json_with_every_key_route() {
+        let spec: Value = serde_json::from_str(&OPENAPI.replace("{BOARD_URL}", "https://x.test")).unwrap();
+        assert_eq!(spec["servers"][0]["url"], "https://x.test");
+        let paths = spec["paths"].as_object().unwrap();
+        for (m, p) in [
+            ("get", "/api/ping"), ("get", "/api/openapi.json"), ("get", "/api/agents/{name}"), ("post", "/api/agents/{name}"),
+            ("delete", "/api/agents/{name}"), ("post", "/api/terminals/{pane_id}/input"),
+        ] {
+            assert!(paths[p][m].is_object(), "{m} {p} is not described");
         }
     }
 

@@ -88,6 +88,8 @@
   .st { font: 18px/1 var(--pixel); letter-spacing: .01em; padding: 1px 6px; border: 1.2px solid currentColor; }
   .aws { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
   .aws .meta { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  #keys, #newkey, #key-new { margin-top: 8px; }
+  #keys { align-items: center; }
   /* The terminal: a typesafe.ai window on the desk, the pane's screen on paper inside its double rule. */
   #chat { position: fixed; inset: 0; z-index: 10; display: none; padding: 8px; background: inherit; }
   #chat.open { display: flex; }
@@ -124,6 +126,12 @@
     <div class="frame">
       <div id="accts"><div class="empty">loading accounts</div></div>
       <div class="card aws"><span class="title">AWS</span><span class="meta" id="aws-who">checking</span><button id="aws-login">sign in</button></div>
+      <div class="card">
+        <div class="row"><span class="title">API keys</span><span class="meta">another agent's standing Claude · /api/openapi.json</span></div>
+        <div id="keys" class="meta"></div>
+        <form id="newkey" class="row"><input id="key-name" placeholder="name, e.g. instinct" required pattern="[a-z0-9-]{1,32}" autocomplete="off" style="flex:1"><button class="dark">+ key</button></form>
+        <div id="key-new" class="hidden"><input id="key-val" readonly><div class="meta">shown once: copy it now</div></div>
+      </div>
       <form id="login" class="card form hidden">
         <a id="login-url" target="_blank" rel="noopener noreferrer"></a>
         <input id="code" required autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
@@ -224,7 +232,7 @@
   }
 
   async function refresh() {
-    const [issues, meta, accts] = await Promise.all(['/api/issues', '/api/meta', '/api/accounts'].map(u => api(u).then(r => r.json())));
+    const [issues, meta, accts, keys] = await Promise.all(['/api/issues', '/api/meta', '/api/accounts', '/api/keys'].map(u => api(u).then(r => r.json())));
     $('board').innerHTML = SECTIONS.map(([key, label, color]) => {
       const rows = issues.filter(i => i.status === key).sort((a, b) => key === 'open' ? a.id - b.id : (b.updated || 0) - (a.updated || 0));
       const bar = `<h2 class="tb"><b style="background:var(${color})"></b>${label}${rows.length ? ` (${rows.length})` : ''}</h2>`;
@@ -234,6 +242,7 @@
       return `<section class="win">${bar}<div class="frame">${cards}</div></section>`;
     }).join('');
     showAccounts(accts);
+    showKeys(keys);
     $('usage').textContent = `switches account at ${meta.cap ?? 60}% · agents pause when every account is past it${meta.state ? ' · ' + meta.state : ''}`;
     $('repos').innerHTML = (meta.repos || []).map(r => `<option value="${esc(r)}">`).join('');
     const d = meta.deploy;  // deploy.sh's last result: ok is null while it runs
@@ -300,6 +309,32 @@
     if (d) $('code').value = '';
   };
   $('login-x').onclick = () => accountCall(`/api/accounts/${loginKind}/login`, { method: 'DELETE' }, $('login-x'));
+  // Keys for other agents (Instinct): made here, shown once, revoked here.
+  const showKeys = ks => $('keys').innerHTML = ks.length
+    ? ks.map(k => `<span>${esc(k.name)} · …${esc(k.hint)} · ${ago(k.created)}</span><button data-revoke="${esc(k.name)}">revoke</button>`).join('')
+    : '<span>no keys yet</span>';
+  async function keyCall(url, opts, busy) {
+    $('acct-err').textContent = '';
+    busy.disabled = true;
+    const r = await api(url, opts), d = await r.json();
+    busy.disabled = false;
+    if (!r.ok) { $('acct-err').textContent = d.error; return; }
+    showKeys(d.keys || d);
+    return d;
+  }
+  $('newkey').onsubmit = async e => {
+    e.preventDefault();
+    const d = await keyCall('/api/keys', { method: 'POST', body: JSON.stringify({ name: $('key-name').value.trim() }) }, e.submitter);
+    if (!d) return;
+    $('key-name').value = '';
+    $('key-val').value = d.key;
+    $('key-new').classList.remove('hidden');
+    $('key-val').select();
+  };
+  $('keys').onclick = e => {
+    const b = e.target.closest('[data-revoke]');
+    if (b && confirm(`Revoke key ${b.dataset.revoke}? Whatever uses it stops working.`)) keyCall(`/api/keys/${b.dataset.revoke}`, { method: 'DELETE' }, b);
+  };
 
   $('deploy-x').onclick = async () => { await api('/api/deploy', { method: 'DELETE' }); $('deploy').classList.add('hidden'); };
 

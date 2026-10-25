@@ -1,5 +1,5 @@
 //! FEMME issues board: one page plus a JSON API over a single file.
-//! Sign-in: a magic link to the one allowed address (BOARD_EMAIL), sent through Resend,
+//! Sign-in: a magic link to an allowed address (BOARD_EMAIL, comma-separated), sent through Resend,
 //! then a 7-day cookie. Listens on localhost; Caddy in front adds TLS.
 //! The worker (worker.sh) uses the same API with the bearer token in <state>/worker.token.
 //! The game server files player bug reports (POST /api/reports) with its own token in
@@ -63,7 +63,7 @@ struct App {
     sessions_path: PathBuf,
     meta: PathBuf,
     home: PathBuf,
-    email: String,
+    emails: Vec<String>,
     url: String,
     resend_key: String,
     from: String,
@@ -196,14 +196,14 @@ fn main() {
         sessions_path: dir.join("sessions.json"),
         meta: dir.join("meta.json"),
         home: PathBuf::from(var("HOME")),
-        email: var("BOARD_EMAIL").trim().to_lowercase(),
+        emails: var("BOARD_EMAIL").split(',').map(|e| e.trim().to_lowercase()).filter(|e| !e.is_empty()).collect(),
         url: var("BOARD_URL").trim_end_matches('/').into(),
         resend_key: var("RESEND_API_KEY"),
         from: var("MAIL_FROM"),
         accounts: Arc::new(Mutex::new(Value::Null)),
         logins: HashMap::new(),
     };
-    assert!(!app.email.is_empty() && !app.url.is_empty(), "BOARD_EMAIL and BOARD_URL must be set");
+    assert!(!app.emails.is_empty() && !app.url.is_empty(), "BOARD_EMAIL and BOARD_URL must be set");
     if app.resend_key.is_empty() {
         eprintln!("RESEND_API_KEY is not set: sign-in links are printed here instead of emailed");
     }
@@ -244,12 +244,12 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             let input = read_json(req).unwrap_or_default();
             let asked = input["email"].as_str().unwrap_or("").trim().to_lowercase();
             // Same answer either way, so the page never reveals which address is allowed.
-            if asked == app.email && now() >= app.last_mail + 60 {
+            if app.emails.contains(&asked) && now() >= app.last_mail + 60 {
                 app.last_mail = now();
                 let token = random_hex();
                 app.links.retain(|_, exp| *exp > now());
                 app.links.insert(token.clone(), now() + LINK_SECS);
-                if let Err(e) = send_link(app, &format!("{}/magic/{token}", app.url)) {
+                if let Err(e) = send_link(app, &asked, &format!("{}/magic/{token}", app.url)) {
                     eprintln!("sign-in mail failed: {e}");
                 }
             }
@@ -1014,14 +1014,14 @@ fn cookie(app: &App, value: &str, max_age: u64) -> Header {
     Header::from_bytes("Set-Cookie", c).unwrap()
 }
 
-fn send_link(app: &App, link: &str) -> Result<(), String> {
+fn send_link(app: &App, to: &str, link: &str) -> Result<(), String> {
     if app.resend_key.is_empty() {
         eprintln!("sign-in link: {link}");
         return Ok(());
     }
     let body = json!({
         "from": app.from,
-        "to": [app.email],
+        "to": [to],
         "subject": "Sign in to FEMME",
         "text": format!("Sign in to your FEMME board (valid 15 minutes, once):\n\n{link}\n"),
         "html": format!(r#"<p>Sign in to your FEMME board (valid 15 minutes, once):</p><p><a href="{link}">Sign in to FEMME</a></p>"#),

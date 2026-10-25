@@ -14,6 +14,10 @@ command -v opencode >/dev/null || [ -x ~/.opencode/bin/opencode ] || curl -fsSL 
 command -v codegraph >/dev/null || curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
 # ponytail: whiteboard is a desktop app; the synced Claude hooks call it, so no-op it here.
 [ -e ~/.local/bin/whiteboard ] || printf '#!/bin/sh\nexit 0\n' > ~/.local/bin/whiteboard && chmod +x ~/.local/bin/whiteboard
+# Every Claude here runs as `claude --dangerously-skip-permissions` (same mode, no dialog): nobody is
+# at the keyboard to answer prompts. sync.sh copies the laptop's settings over this file first.
+mkdir -p ~/.claude; f=~/.claude/settings.json; [ -s $f ] || echo {} > $f
+jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true' $f > $f.tmp && mv $f.tmp $f
 
 # Same herdr version as the laptop: the laptop's client talks to this server.
 want=${HERDR_VERSION:?pass HERDR_VERSION}

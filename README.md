@@ -22,7 +22,7 @@ ssh agentbox                                # one-time logins, credentials are n
 #   gh auth login && gh auth setup-git
 ```
 
-Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`). `.env` is gitignored and holds your IP and ntfy topic.
+Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`, `SPAWN_TYPES`). `.env` is gitignored and holds your IP and ntfy topic.
 
 ### Laptop
 
@@ -61,6 +61,14 @@ Sync rules:
 2. In Moshi, generate a key and copy the public key. On the laptop: `ssh agentbox 'cat >> ~/.ssh/authorized_keys'`, paste, Ctrl-D.
 3. Add host: `darkwarro@<IP from .env>`, mosh on, command `herdr`.
 4. In ntfy, subscribe to the `NTFY_TOPIC` from `.env`. Anyone who knows the topic can read your pushes, so keep it secret.
+
+### The box's own AWS access
+
+`provision.sh` gives the instance the IAM role `femme`: launch, stop and terminate instances of the `SPAWN_TYPES` types in `REGION` only (plus the security groups, key pairs and tags that takes), no IAM. The credentials come from the instance metadata service and rotate themselves, so there is nothing to leak; but anything running on the box can use them, so the policy is the guard.
+
+After rerunning `./provision.sh`, remove whatever is in `~/.aws` on the VPS (a static key or the board's `aws login` session shadows the role): `aws logout`, or delete the files. Then `aws sts get-caller-identity` shows `assumed-role/femme/i-…`, and so does the board's accounts window.
+
+Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard instances" (vCPUs) for the region to e.g. 16. Add a Budgets email alert too, but alerts lag hours and stop nothing. Credits apply to the bill automatically.
 
 ## Issues board
 

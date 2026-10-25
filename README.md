@@ -92,6 +92,14 @@ Content-Type: application/json
 - Reports land as **Player reports** (status `triage`), which the worker never starts. **Queue it** moves one to the queue (`open`); **Delete** drops it.
 - `.env`: `FEMME_REPORT_REPO` (default `Darkosxl/mksm-recomp`), `FEMME_REPORT_BASE` (the branch PRs start from and target, default `shaolin-monks-decomp`), `FEMME_REPORT_LIMIT` (reports per hour, all players together, default 30).
 
+### API for other agents
+
+Another agent (Instinct) gets one standing Claude Code session on the box, reused for all its tasks, so the board is not filled with one terminal per task. Make it a key in the accounts window (**API keys**, name it, copy the key: it is shown once) and hand over the key with `$BOARD_URL/api/openapi.json`, an OpenAPI 3 document written for a program to read: auth, each route with an example, errors, what is safe to retry. **revoke** next to a key ends it at once; keys live in `~/.local/state/femme/api-keys.json`.
+
+- `POST /api/agents/<name>` `{"text": "...", "repo": "Amore-Labs-Inc/Exposure"}` sends a task. When nothing runs under that name, the repo is cloned to `~/femme-work/<name>`, Claude starts there in a workspace labelled with the name (its trust question answered yes: the folder was the caller's choice), and a standing brief goes before the text: do each task end to end, check it, commit, `git pull --rebase` and push onto `push` (default `main`); no PRs. The session shows on the Terminals tab like any other, so you can watch or step in.
+- `GET /api/agents/<name>` returns `status`, the screen as text, and once Claude stopped a `message` read off the clone: `changes created and pushed to Exposure` (with `pushed: true` and the commit) when the tree is clean and HEAD is on the branch and moved since the task was sent; otherwise that it finished with nothing new, or stopped without pushing. `DELETE` closes the session.
+- A key reaches `/api/ping`, `/api/openapi.json`, `/api/agents/<name>` and `/api/terminals/<pane>/input` (answering Claude's own prompts). Everything else answers 403 to it.
+
 ### Accounts
 
 The board's **accounts** window lists every Claude account stored with [cswap](https://pypi.org/project/claude-swap/), with each account's 5-hour and 7-day usage.

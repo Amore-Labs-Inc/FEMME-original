@@ -1,0 +1,122 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FEMME board API",
+    "version": "1",
+    "description": "Gives an outside agent (Instinct) one standing Claude Code session on the FEMME box, a VPS, reused for all its tasks.\n\n**How to use it**: pick a name once (`instinct`). `POST /api/agents/instinct` with `text` sends a task; the first call (and any call after the session is gone) opens the terminal first: `repo` is cloned into the box's `~/femme-work/instinct`, Claude Code starts there, and a standing brief goes in front of your text: every task is done end to end, checked, committed and pushed straight onto `push` (default `main`), no PRs. Then poll `GET /api/agents/instinct` every 10-30 s: `status` `working` means busy (`message` is null); `idle` or `done` means it finished, and `message` says what came of it, read off the clone's git state: `changes created and pushed to Exposure` with `pushed: true` and the `commit`, or that it finished with nothing new to push, or that it stopped without pushing (then read `screen`, whose last lines are Claude's answer); `blocked` means it asks something: read `screen`, answer with `POST /api/terminals/{pane_id}/input` (for example `{\"data\":\"y\\r\"}`), or send a new `POST .../agents/instinct` with your answer once it is `idle`. Send the next task to the same name: the session remembers the earlier ones. Never open a session per task.\n\n**Base URL**: this server only ({BOARD_URL}); no staging or sandbox. Paths are not versioned; a breaking change gets a new path and this document says so. **Changelog**: the FEMME repository's commits (README, *API for other agents*).\n\n**Auth**: every request carries `Authorization: Bearer <key>`. The board's owner makes the key on the board (accounts window, *API keys*): 64 hex characters, shown once, handed over by them. Every key has the same scope: exactly the routes here; any other route answers 403. No expiry; the owner revokes it on the board, which takes effect at once (then 401). To test a key: `GET /api/ping`.\n\n**Errors**: one envelope, `{\"error\": \"<message>\"}` with the status code (409 and 502 from POST may add `pane_id`). 400 bad input (the message names the field), 401 missing or wrong key, 403 route outside the key's scope, 404 not running / unknown pane, 409 the agent cannot take a message now (blocked on a question: read the screen), 415 body not `application/json`, 502 the box could not open the terminal, clone the repo or start Claude (message says which). No rate limit and no 429: the server handles one request at a time; keep calls sequential and poll no faster than every 2 s.\n\n**Conventions**: bodies are JSON with `Content-Type: application/json` (required on POST). No lists, so no pagination; no timestamps in this API; no webhooks, poll. GET is read-only and safe. POST `/api/agents/{name}` is not idempotent: each call is one more message to Claude, so on a timeout check `GET` before resending. DELETE can be repeated (404 the second time).\n\n**Testing without side effects**: `GET /api/ping`, `GET /api/agents/{name}` (404 until you open one). To try the whole flow harmlessly: `POST /api/agents/test-1` with `{\"text\":\"Reply with the word pong and nothing else.\"}` and no `repo` (opens in the box's home, no code is touched), read it back, then `DELETE /api/agents/test-1`.",
+    "contact": { "name": "FEMME", "url": "https://github.com/Darkosxl/FEMME" }
+  },
+  "servers": [{ "url": "{BOARD_URL}" }],
+  "security": [{ "bearer": [] }],
+  "components": {
+    "securitySchemes": {
+      "bearer": { "type": "http", "scheme": "bearer", "description": "The contents of ~/.local/state/femme/api.token on the box." }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": { "error": { "type": "string", "example": "text: 1 to 100000 bytes" }, "pane_id": { "type": "string", "description": "On 409/502 from POST when the terminal exists anyway.", "example": "w9:p1" } }
+      },
+      "Agent": {
+        "type": "object",
+        "properties": {
+          "pane_id": { "type": "string", "description": "The terminal Claude runs in; the id for /api/terminals/{pane_id}/input.", "example": "w9:p1" },
+          "status": { "type": "string", "enum": ["working", "idle", "done", "blocked", "unknown"], "description": "working: busy. idle or done: finished its turn, see `message` and `screen`. blocked: waiting for an answer (a yes/no, a choice): read `screen` and answer through /input." },
+          "message": { "type": "string", "nullable": true, "description": "null while working. Once stopped: `changes created and pushed to <repo>` when the clone is clean, on its remote branch and moved since the task was sent; `finished, nothing new to push: read the screen`; `stopped without pushing to <branch>: read the screen`; `waiting for an answer: read the screen` when blocked; `finished: read the screen` for a session without a repo.", "example": "changes created and pushed to Exposure" },
+          "pushed": { "type": "boolean", "description": "true exactly when `message` reports a push.", "example": true },
+          "commit": { "type": "string", "description": "The pushed HEAD, only when `pushed` is true.", "example": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0" },
+          "screen": { "type": "string", "description": "The visible terminal, plain text, last ~50 lines. Claude's latest answer is at the bottom, above its `> ` prompt line.", "example": "● Added GET /health in api/routes.py with a test; suite green; pushed to main (a1b2c3d).\n\n> " }
+        }
+      }
+    },
+    "responses": {
+      "400": { "description": "Bad input; the message names the field.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "repo must look like owner/name" } } } },
+      "401": { "description": "No key or a wrong key.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "sign in first" } } } },
+      "403": { "description": "The key does not reach this route.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name} and /api/terminals/{pane}/input" } } } },
+      "404": { "description": "Not running (open it with POST), or no such pane.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "not running" } } } },
+      "415": { "description": "The body is not application/json.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "expected application/json" } } } }
+    }
+  },
+  "paths": {
+    "/api/ping": {
+      "get": {
+        "summary": "Check the key",
+        "description": "Read-only, safe any time. 200 means the key works.",
+        "x-example-request": "curl -H 'Authorization: Bearer $KEY' {BOARD_URL}/api/ping",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "example": { "ok": true } } } },
+          "401": { "$ref": "#/components/responses/401" }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "summary": "This document",
+        "description": "Read-only.",
+        "x-example-request": "curl -H 'Authorization: Bearer $KEY' {BOARD_URL}/api/openapi.json",
+        "responses": { "200": { "description": "OpenAPI 3.0 JSON" }, "401": { "$ref": "#/components/responses/401" } }
+      }
+    },
+    "/api/agents/{name}": {
+      "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$" }, "description": "Your session's name; keep using the same one.", "example": "instinct" }],
+      "get": {
+        "summary": "The session's state and screen",
+        "description": "Read-only. Poll this after a POST, every 10-30 s, until `status` is not `working`.",
+        "x-example-request": "curl -H 'Authorization: Bearer $KEY' {BOARD_URL}/api/agents/instinct",
+        "responses": {
+          "200": { "description": "Running", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Agent" },
+            "example": { "pane_id": "w9:p1", "status": "idle", "message": "changes created and pushed to Exposure", "pushed": true, "commit": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "screen": "● Added GET /health in api/routes.py with a test; suite green; pushed to main (a1b2c3d).\n\n> " } } } },
+          "400": { "$ref": "#/components/responses/400" },
+          "401": { "$ref": "#/components/responses/401" },
+          "404": { "$ref": "#/components/responses/404" }
+        }
+      },
+      "post": {
+        "summary": "Send a task (opens the session when it is not running)",
+        "description": "Mutating, not idempotent: every call is one more message to the same Claude. When the session is not running, it is opened first, which takes up to a minute: `repo` (owner/name the box's GitHub login can push to) is cloned to `~/femme-work/{name}` the first time and reused after; without `repo`, `cwd` (an existing folder under the box's home) or home is used and nothing is pushed. `push` (default `main`) is the branch every finished task is pushed onto; it only matters when opening. Returns once Claude has taken the message (`status` is `working`); then poll GET. 409 when Claude is blocked on a question: read GET's `screen` and answer with /input.",
+        "x-example-request": "curl -X POST -H 'Authorization: Bearer $KEY' -H 'Content-Type: application/json' -d '{\"text\":\"Add GET /health returning {\\\"ok\\\":true} to the API, with a test.\",\"repo\":\"Amore-Labs-Inc/Exposure\",\"push\":\"main\"}' {BOARD_URL}/api/agents/instinct",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["text"], "properties": {
+              "text": { "type": "string", "minLength": 1, "maxLength": 100000, "description": "The task, in full: what, where, how to check it. Multi-line is fine." },
+              "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", "description": "Only read when opening. Cloned to ~/femme-work/{name} on the box.", "example": "Amore-Labs-Inc/Exposure" },
+              "push": { "type": "string", "pattern": "^[A-Za-z0-9_./-]+$", "default": "main", "description": "Only read when opening, with `repo`: the branch finished work is pushed onto." },
+              "cwd": { "type": "string", "description": "Only read when opening, without `repo`: a folder under the box's home. Default: home." } } },
+            "example": { "text": "Add GET /health returning {\"ok\":true} to the API, with a test.", "repo": "Amore-Labs-Inc/Exposure", "push": "main" } } } },
+        "responses": {
+          "200": { "description": "Submitted; Claude is on it.", "content": { "application/json": { "example": { "pane_id": "w9:p1", "status": "working" } } } },
+          "400": { "$ref": "#/components/responses/400" },
+          "401": { "$ref": "#/components/responses/401" },
+          "409": { "description": "Claude cannot take a message now (blocked on a question, or still starting). Read GET's screen.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "agent_blocked", "pane_id": "w9:p1" } } } },
+          "415": { "$ref": "#/components/responses/415" },
+          "502": { "description": "Could not open: the clone failed (repo name, access), the terminal did not open, or Claude did not start. Nothing is left running.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "could not clone Amore-Labs-Inc/Exposure" } } } }
+        }
+      },
+      "delete": {
+        "summary": "Close the session",
+        "description": "Mutating. Ends Claude and its terminal; the clone stays, so the next POST reopens on it. Not needed between tasks.",
+        "x-example-request": "curl -X DELETE -H 'Authorization: Bearer $KEY' {BOARD_URL}/api/agents/instinct",
+        "responses": {
+          "200": { "description": "Closed", "content": { "application/json": { "example": { "ok": true } } } },
+          "401": { "$ref": "#/components/responses/401" },
+          "404": { "$ref": "#/components/responses/404" }
+        }
+      }
+    },
+    "/api/terminals/{pane_id}/input": {
+      "parameters": [{ "name": "pane_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^w[A-Za-z0-9]+:p[A-Za-z0-9]+$" }, "description": "From GET /api/agents/{name}.", "example": "w9:p1" }],
+      "post": {
+        "summary": "Type raw keys into the session's terminal",
+        "description": "Mutating, not idempotent. For answering Claude's own prompts when `status` is `blocked`. `data` is typed as is: `\\r` is Enter, `\\u001b` Escape, `\\u0003` Ctrl-C; `y\\r` answers a yes/no, `2\\r` picks option 2. For a whole message use POST /api/agents/{name} instead.",
+        "x-example-request": "curl -X POST -H 'Authorization: Bearer $KEY' -H 'Content-Type: application/json' -d '{\"data\":\"y\\r\"}' {BOARD_URL}/api/terminals/w9:p1/input",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "type": "string", "minLength": 1, "maxLength": 100000 } } }, "example": { "data": "y\r" } } } },
+        "responses": {
+          "200": { "description": "Typed", "content": { "application/json": { "example": { "ok": true } } } },
+          "400": { "$ref": "#/components/responses/400" },
+          "401": { "$ref": "#/components/responses/401" },
+          "404": { "$ref": "#/components/responses/404" },
+          "415": { "$ref": "#/components/responses/415" }
+        }
+      }
+    }
+  }
+}

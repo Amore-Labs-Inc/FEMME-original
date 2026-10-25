@@ -76,6 +76,9 @@ struct App {
 /// - claude: a new cswap account. It signs in under its own config dir, so the box's live login
 ///   (and every agent on it) stays untouched; `cswap add` then stores it from there.
 /// - aws: the box's own AWS CLI (`aws login --remote`).
+/// - gh: a GitHub account for an API key. The other way round: gh shows a one-time code, the
+///   account's owner enters it at github.com/login/device, and gh ends when they have. It runs
+///   in its own config dir, so the box's gh login (and the worker's pushes) stay as they are.
 struct Login {
     child: Child,
     dir: PathBuf,
@@ -88,12 +91,12 @@ impl Login {
         fs::DirBuilder::new().mode(0o700).create(&dir).map_err(|e| e.to_string())?;
         let log = fs::File::create(dir.join("out")).map_err(|e| e.to_string())?;
         let mut cmd = Command::new(kind);
-        if kind == "claude" {
+        match kind {
             // BROWSER: nothing to open here, the link goes to the board.
-            cmd.args(["auth", "login"]).env("CLAUDE_CONFIG_DIR", &dir).env("BROWSER", "true");
-        } else {
-            cmd.args(["login", "--remote"]);
-        }
+            "claude" => cmd.args(["auth", "login"]).env("CLAUDE_CONFIG_DIR", &dir).env("BROWSER", "true"),
+            "gh" => cmd.args(["auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web", "--skip-ssh-key"]).env("GH_CONFIG_DIR", dir.join("gh")),
+            _ => cmd.args(["login", "--remote"]),
+        };
         let child = cmd
             .stdin(Stdio::piped())
             .stdout(log.try_clone().map_err(|e| e.to_string())?)
@@ -102,7 +105,7 @@ impl Login {
             .map_err(|e| format!("{kind}: {e}"))?;
         let mut login = Login { child, dir, started: now() };
         for _ in 0..75 {
-            if login.url().is_some() {
+            if login.url().is_some() || login.code().is_some() {
                 return Ok(login);
             }
             if login.child.try_wait().ok().flatten().is_some() {
@@ -119,6 +122,23 @@ impl Login {
 
     fn url(&self) -> Option<String> {
         login_url(&self.output())
+    }
+
+    /// gh's one-time code, to be entered at github.com/login/device.
+    fn code(&self) -> Option<String> {
+        device_code(&self.output())
+    }
+
+    /// Whether gh has ended, and how: Ok once the code was entered, Err with gh's last line.
+    fn done(&mut self) -> Option<Result<(), String>> {
+        let status = self.child.try_wait().ok().flatten()?;
+        Some(if status.success() { Ok(()) } else { Err(last_line(&self.output()).unwrap_or("GitHub sign-in failed").to_string()) })
+    }
+
+    /// The token gh ended up with, from its own config dir.
+    fn token(&self) -> Option<String> {
+        let out = Command::new("gh").args(["auth", "token"]).env("GH_CONFIG_DIR", self.dir.join("gh")).output().ok()?;
+        out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_string()).filter(|t| !t.is_empty())
     }
 
     /// Hands over the code the sign-in page showed and waits for the command to finish.
@@ -259,7 +279,8 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
     // Another agent's key opens the routes in api_route and nothing else.
     let auth = header(req, "Authorization");
     let key = auth.strip_prefix("Bearer ").unwrap_or("");
-    if !key.is_empty() && app.keys.iter().any(|k| same(text(k, "key").as_bytes(), key.as_bytes())) {
+    let caller = app.keys.iter().find(|k| !key.is_empty() && same(text(k, "key").as_bytes(), key.as_bytes())).cloned();
+    if caller.is_some() {
         if !api_route(&method, &parts) {
             return err(403, "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name} and /api/terminals/{pane}/input");
         }
@@ -300,7 +321,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             }
             let (pane, text) = match named_agent(name) {
                 Some((pane, _)) => (pane, text),
-                None => match open_agent(app, name, &input) {
+                None => match open_agent(app, name, &input, caller.as_ref()) {
                     Ok((pane, brief)) => (pane, format!("{brief}{text}")),
                     Err(e) => return e,
                 },
@@ -317,8 +338,12 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                 Err(e) => ok(json!({"error": e, "pane_id": pane})).with_status_code(409),
             }
         }
-        // Keys for other agents: made and revoked here, shown once.
-        (Method::Get, ["api", "keys"]) => ok(keys_public(app)),
+        // Keys for other agents: made and revoked here, shown once. A key may carry a GitHub
+        // account (a token pasted, or signed in with gh's device code): its clones push as it.
+        (Method::Get, ["api", "keys"]) => {
+            settle_github(app);
+            ok(keys_public(app))
+        }
         (Method::Post, ["api", "keys"]) => {
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
             let name = text(&input, "name").trim().to_string();
@@ -328,20 +353,48 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             if app.keys.iter().any(|k| text(k, "name") == name) {
                 return err(409, "a key with that name exists: revoke it first");
             }
-            let key = random_hex();
-            app.keys.push(json!({"name": name, "key": key, "created": now()}));
+            let mut record = json!({"name": name, "key": random_hex(), "created": now()});
+            let token = text(&input, "github_token").trim();
+            if !token.is_empty() {
+                if !valid_token(token) {
+                    return err(400, "github_token: a GitHub token is letters, digits and _");
+                }
+                match github_identity(token) {
+                    Ok(who) => with_github(&mut record, token, who),
+                    Err(e) => return err(400, &e),
+                }
+            }
+            app.keys.push(record.clone());
             match write_private(&app.keys_path, &json!(app.keys).to_string()) {
-                Ok(()) => ok(json!({"name": name, "key": key, "keys": keys_public(app)})).with_status_code(201),
+                Ok(()) => ok(json!({"name": name, "key": record["key"], "keys": keys_public(app)})).with_status_code(201),
                 Err(e) => e,
             }
         }
         (Method::Delete, ["api", "keys", name]) => {
+            app.logins.remove(&format!("gh:{name}"));
             let before = app.keys.len();
             app.keys.retain(|k| text(k, "name") != *name);
             if app.keys.len() == before {
                 return err(404, "not found");
             }
             write_private(&app.keys_path, &json!(app.keys).to_string()).map(|_| ok(keys_public(app))).unwrap_or_else(|e| e)
+        }
+        (Method::Post, ["api", "keys", name, "github"]) => {
+            let Some(k) = app.keys.iter_mut().find(|k| text(k, "name") == *name) else { return err(404, "not found") };
+            k.as_object_mut().unwrap().remove("github_error");
+            let id = format!("gh:{name}");
+            app.logins.remove(&id); // ends an earlier attempt first
+            match Login::start("gh", app.meta.with_file_name(format!("login-{id}"))) {
+                Ok(login) => {
+                    app.logins.insert(id, login);
+                    ok(keys_public(app))
+                }
+                Err(e) => err(502, &format!("gh: {e}")),
+            }
+        }
+        (Method::Delete, ["api", "keys", name, "github"]) => {
+            app.logins.remove(&format!("gh:{name}"));
+            ok(keys_public(app))
         }
         (Method::Delete, ["api", "agents", name]) => {
             if !valid_name(name) {
@@ -601,9 +654,88 @@ fn outcome(dir: &Path, before: Option<&str>, status: &str) -> Value {
     }
 }
 
-/// The keys without their secret: name, when, and the last 4 characters to tell them apart.
+/// The keys without their secrets: name, when, the last 4 characters to tell them apart, whose
+/// GitHub account their clones push as, and a GitHub sign-in in progress (its code) or how the
+/// last one failed.
 fn keys_public(app: &App) -> Value {
-    Value::Array(app.keys.iter().map(|k| json!({"name": k["name"], "created": k["created"], "hint": text(k, "key").chars().rev().take(4).collect::<String>().chars().rev().collect::<String>()})).collect())
+    let hint = |k: &Value| text(k, "key").chars().rev().take(4).collect::<String>().chars().rev().collect::<String>();
+    let account = |k: &Value| match (text(k, "github_token").is_empty(), text(k, "git_name"), text(k, "github_login")) {
+        (true, ..) => "the box".to_string(),
+        (false, "", "") => "its own token".to_string(),
+        (false, n, l) => format!("{n} ({l})"),
+    };
+    let pending = |k: &Value| app.logins.get(&format!("gh:{}", text(k, "name"))).and_then(Login::code).map(|code| json!({"code": code, "url": "https://github.com/login/device"}));
+    Value::Array(
+        app.keys
+            .iter()
+            .map(|k| json!({"name": k["name"], "created": k["created"], "hint": hint(k), "account": account(k), "github": pending(k), "error": k["github_error"]}))
+            .collect(),
+    )
+}
+
+/// A GitHub sign-in that ended: its token goes onto the key, with the account's name and the
+/// noreply address GitHub gives it for commits; gh's config dir goes when the Login drops. A
+/// failed one leaves its reason on the key until the next attempt.
+fn settle_github(app: &mut App) {
+    let names: Vec<String> = app.logins.keys().filter_map(|k| k.strip_prefix("gh:")).map(String::from).collect();
+    let mut changed = false;
+    for name in names {
+        let id = format!("gh:{name}");
+        let Some(result) = app.logins.get_mut(&id).and_then(Login::done) else { continue };
+        let login = app.logins.remove(&id).unwrap();
+        let token = result.and_then(|_| login.token().ok_or_else(|| "gh kept no token".to_string()));
+        let Some(k) = app.keys.iter_mut().find(|k| text(k, "name") == name) else { continue };
+        match token.and_then(|t| github_identity(&t).map(|who| (t, who))) {
+            Ok((t, who)) => with_github(k, &t, who),
+            Err(e) => k["github_error"] = e.into(),
+        }
+        changed = true;
+    }
+    if changed {
+        let _ = write_private(&app.keys_path, &json!(app.keys).to_string());
+    }
+}
+
+/// Puts a GitHub account on a key: the token its clones push with, and who commits.
+fn with_github(key: &mut Value, token: &str, (login, name, email): (String, String, String)) {
+    key["github_token"] = token.into();
+    key["github_login"] = login.into();
+    key["git_name"] = name.into();
+    key["git_email"] = email.into();
+    key.as_object_mut().unwrap().remove("github_error");
+}
+
+/// Who a GitHub token belongs to: (login, name or login, the noreply address GitHub gives them,
+/// which attributes commits to them without exposing an address).
+fn github_identity(token: &str) -> Result<(String, String, String), String> {
+    let out = Command::new("gh").args(["api", "user"]).env("GH_TOKEN", token).output().map_err(|e| e.to_string())?;
+    let v: Value = serde_json::from_slice(&out.stdout).unwrap_or_default();
+    let login = text(&v, "login").to_string();
+    if !out.status.success() || login.is_empty() {
+        return Err("GitHub did not accept that token".into());
+    }
+    let name = v["name"].as_str().map(str::trim).filter(|n| !n.is_empty()).unwrap_or(&login).to_string();
+    Ok((login.clone(), name, noreply(v["id"].as_u64().unwrap_or(0), &login)))
+}
+
+fn noreply(id: u64, login: &str) -> String {
+    format!("{id}+{login}@users.noreply.github.com")
+}
+
+/// A GitHub token as GitHub issues them (ghp_…, github_pat_…, gho_…): letters, digits and underscores.
+fn valid_token(s: &str) -> bool {
+    (20..=255).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+}
+
+/// gh's device code in its output: `! First copy your one-time code: 24E9-601B`.
+fn device_code(out: &str) -> Option<String> {
+    let code: String = out[out.find("one-time code: ")? + 15..].chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
+    (code.len() >= 8).then_some(code)
+}
+
+/// The clone URL for a key's own token: GitHub takes any username with a token as the password.
+fn clone_url(repo: &str, token: &str) -> String {
+    if token.is_empty() { format!("https://github.com/{repo}.git") } else { format!("https://x-access-token:{token}@github.com/{repo}.git") }
 }
 
 /// The pane and status of the herdr agent called `name`, if it is running.
@@ -615,9 +747,11 @@ fn named_agent(name: &str) -> Option<(String, String)> {
 
 /// Opens a workspace and starts Claude in it under `name`. `repo` (owner/name) is cloned to
 /// ~/femme-work/<name> on first use and becomes the folder; otherwise `cwd` (under home), else
-/// home. Returns the pane and the brief that goes in front of the first message: the session's
-/// standing orders, with `push` (default main) the branch each finished task lands on.
-fn open_agent(app: &App, name: &str, input: &Value) -> Result<(String, String), Resp> {
+/// home. With a GitHub token on the caller's key, the clone pulls and pushes as that account and
+/// commits under its name (set again on every open, so a remade key takes over). Returns the pane
+/// and the brief that goes in front of the first message: the session's standing orders, with
+/// `push` (default main) the branch each finished task lands on.
+fn open_agent(app: &App, name: &str, input: &Value, caller: Option<&Value>) -> Result<(String, String), Resp> {
     let repo = text(input, "repo").trim();
     let push = input["push"].as_str().unwrap_or("main");
     if !valid_branch(push) {
@@ -630,12 +764,28 @@ fn open_agent(app: &App, name: &str, input: &Value) -> Result<(String, String), 
             return Err(err(400, "repo must look like owner/name"));
         }
         let dir = app.home.join("femme-work").join(name);
+        let token = caller.map_or("", |k| text(k, "github_token"));
         if !dir.join(".git").is_dir() {
             let _ = fs::create_dir_all(dir.parent().unwrap());
-            let out = Command::new("gh").args(["repo", "clone", repo]).arg(&dir).args(["--", "--quiet"]).output();
+            let out = if token.is_empty() {
+                Command::new("gh").args(["repo", "clone", repo]).arg(&dir).args(["--", "--quiet"]).output()
+            } else {
+                Command::new("git").args(["clone", "-q", &clone_url(repo, token)]).arg(&dir).output()
+            };
             if !out.as_ref().is_ok_and(|o| o.status.success()) {
                 return Err(err(502, &format!("could not clone {repo}")));
             }
+        }
+        if !token.is_empty() {
+            git(&dir, &["remote", "set-url", "origin", &clone_url(repo, token)]);
+            for (k, v) in [("user.name", "git_name"), ("user.email", "git_email")] {
+                let v = caller.map_or("", |c| text(c, v));
+                if !v.is_empty() {
+                    git(&dir, &["config", k, v]);
+                }
+            }
+        } else if git(&dir, &["remote", "get-url", "origin"]).is_some_and(|u| u.contains("x-access-token")) {
+            git(&dir, &["remote", "set-url", "origin", &clone_url(repo, "")]); // an earlier key's token: the box's gh takes over
         }
         dir.display().to_string()
     };
@@ -1242,6 +1392,25 @@ mod tests {
         ] {
             assert!(!api_route(&m, &p.split('/').collect::<Vec<_>>()), "{m} {p} should be closed to the key");
         }
+    }
+
+    #[test]
+    fn key_github_fields_are_plain() {
+        assert!(valid_token("github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz_0123456789"));
+        assert!(valid_token("ghp_abcdefghijklmnopqrstuvwxyz0123456789"));
+        for bad in ["", "short", "ghp_abc def ghijklmnopqrstuvwxyz", "ghp_abc;defghijklmnopqrstuvwxyz", &"x".repeat(256)] {
+            assert!(!valid_token(bad), "{bad:?} should be rejected");
+        }
+        assert_eq!(clone_url("Amore-Labs-Inc/Exposure", "ghp_t"), "https://x-access-token:ghp_t@github.com/Amore-Labs-Inc/Exposure.git");
+        assert_eq!(clone_url("Amore-Labs-Inc/Exposure", ""), "https://github.com/Amore-Labs-Inc/Exposure.git");
+        assert_eq!(noreply(93056389, "Darkosxl"), "93056389+Darkosxl@users.noreply.github.com");
+        let out = "! Failed to copy one-time code to clipboard\n  No clipboard utilities available.\n! First copy your one-time code: 24E9-601B\nOpen this URL to continue in your web browser: https://github.com/login/device\n";
+        assert_eq!(device_code(out).as_deref(), Some("24E9-601B"));
+        assert_eq!(device_code("- Logging into github.com\n"), None);
+        let mut k = json!({"name": "onur", "github_error": "old"});
+        with_github(&mut k, "ghp_t", ("onur".into(), "Onur".into(), "1+onur@users.noreply.github.com".into()));
+        assert_eq!(k["git_name"], "Onur");
+        assert!(k.get("github_error").is_none());
     }
 
     #[test]

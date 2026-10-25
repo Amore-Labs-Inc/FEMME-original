@@ -22,7 +22,7 @@ ssh agentbox                                # one-time logins, credentials are n
 #   gh auth login && gh auth setup-git
 ```
 
-Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`). `.env` is gitignored and holds your IP and ntfy topic.
+Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`, `SPAWN_TYPES`). `.env` is gitignored and holds your IP and ntfy topic.
 
 ### Laptop
 
@@ -62,6 +62,14 @@ Sync rules:
 3. Add host: `darkwarro@<IP from .env>`, mosh on, command `herdr`.
 4. In ntfy, subscribe to the `NTFY_TOPIC` from `.env`. Anyone who knows the topic can read your pushes, so keep it secret.
 
+### The box's own AWS access
+
+`provision.sh` gives the instance the IAM role `femme`: launch, stop and terminate instances of the `SPAWN_TYPES` types in `REGION` only (plus the security groups, key pairs and tags that takes), no IAM. The credentials come from the instance metadata service and rotate themselves, so there is nothing to leak; but anything running on the box can use them, so the policy is the guard.
+
+After rerunning `./provision.sh`, remove whatever is in `~/.aws` on the VPS (a static key or the board's `aws login` session shadows the role): `aws logout`, or delete the files. Then `aws sts get-caller-identity` shows `assumed-role/femme/i-…`, and so does the board's accounts window.
+
+Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard instances" (vCPUs) for the region to e.g. 16. Add a Budgets email alert too, but alerts lag hours and stop nothing. Credits apply to the bill automatically.
+
 ## Issues board
 
 Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point an A record (DNS only) for `BOARD_URL`'s host at the VPS, rerun `./provision.sh` (opens 80/443) and `./sync.sh`.
@@ -99,7 +107,7 @@ Another agent (Instinct) gets one standing Claude Code session on the box, reuse
 To push as the other person rather than as the box's GitHub login, put their GitHub account on the key: **connect GitHub** next to it shows a one-time code; they enter it at github.com/login/device signed in as themselves (the usual `gh auth login`, in a config dir of its own, so the box's login is untouched), and the key gets their token, name and GitHub noreply address. Or paste a token when making the key (a fine-grained PAT for the repo, Contents: read and write; the name and address come from GitHub). The repos that key's sessions clone are fetched and pushed with the token (it sits in that clone's `.git/config`, so the session's Claude can read it: it works on their behalf anyway) and commits carry the name. Set again on every open, so connecting again takes over; a key without an account hands the clone back to the box's `gh`.
 
 - `POST /api/agents/<name>` `{"text": "...", "repo": "Amore-Labs-Inc/Exposure"}` sends a task. When nothing runs under that name, the repo is cloned to `~/femme-work/<name>`, Claude starts there in a workspace labelled with the name (its trust question answered yes: the folder was the caller's choice), and a standing brief goes before the text: do each task end to end, check it, commit, `git pull --rebase` and push onto `push` (default `main`); no PRs. The session shows on the Terminals tab like any other, so you can watch or step in.
-- `GET /api/agents/<name>` returns `status`, the screen as text, and once Claude stopped a `message` read off the clone: `changes created and pushed to Exposure` (with `pushed: true` and the commit) when the tree is clean and HEAD is on the branch and moved since the task was sent; otherwise that it finished with nothing new, or stopped without pushing. `DELETE` closes the session.
+- `GET /api/agents/<name>` returns `status`, the screen as text, and once Claude stopped a `message` read off the clone: `changes created and pushed to Exposure` (with `pushed: true` and the commit) when the tree is clean and HEAD is on the branch and moved since the task was sent; otherwise that it finished with nothing new, or stopped without pushing. `changes` lists the commits since the task was sent (with their messages) and git's per-file summary, uncommitted work included. `report` is Claude's own account of the task, written to `~/.local/state/femme/report-<name>.md` when it finishes: the brief asks for everything in a form a reader with ADHD takes in at a glance (the point first, short lines, bullets) and the report to be one line on what happened plus up to five bullets on what changed where, what was checked and what is left open. `DELETE` closes the session.
 - A key reaches `/api/ping`, `/api/openapi.json`, `/api/agents/<name>` and `/api/terminals/<pane>/input` (answering Claude's own prompts). Everything else answers 403 to it.
 
 ### Accounts

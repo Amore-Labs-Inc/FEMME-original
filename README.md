@@ -74,7 +74,7 @@ Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard ins
 
 Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point an A record (DNS only) for `BOARD_URL`'s host at the VPS, rerun `./provision.sh` (opens 80/443) and `./sync.sh`.
 
-- Sign in with a magic link sent to your address, one of those in `BOARD_EMAIL` (comma-separated; everyone on it gets the same full access). The link works once, for 15 minutes; the cookie lasts 7 days.
+- Sign in with a magic link sent to your address, one of those in `BOARD_EMAIL` (comma-separated; everyone on it gets the same full access). The link works once, for 15 minutes (one link a minute per client); the cookie lasts 7 days.
 - Add an issue: pick a repo, describe the work. The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
 - **Chat** on a card opens that agent's terminal: a real terminal (xterm.js) showing the pane's live screen in colour. Type straight into it (keys, arrows, Ctrl-C, paste); on a phone the key bar has Esc, Tab, arrows, Ctrl-C and Enter. Paste or drop an image or file (or use the upload button): it is saved to `~/.local/state/femme/uploads` (kept 7 days) and its path is typed in, which Claude Code attaches as an image. **End** closes the workspace.

@@ -287,6 +287,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             v["pane_id"] = pane.into();
             v["status"] = status.into();
             v["screen"] = screen.into();
+            v["report"] = fs::read_to_string(report_path(app, name)).ok().map(|r| r.trim().to_string()).filter(|r| !r.is_empty()).into();
             ok(v)
         }
         (Method::Post, ["api", "agents", name]) => {
@@ -305,6 +306,11 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                     Err(e) => return e,
                 },
             };
+            // Each task ends in a report file, written fresh: a reminder goes with every task, since
+            // the brief only went with the first.
+            let report = report_path(app, name);
+            let _ = fs::remove_file(&report);
+            let text = format!("{text}\n\nWhen done, write the report to {} (overwrite it), as briefed.", report.display());
             if let Some(head) = git(&app.home.join("femme-work").join(name), &["rev-parse", "HEAD"]) {
                 app.heads.insert(name.to_string(), head);
             }
@@ -592,13 +598,34 @@ fn outcome(dir: &Path, before: Option<&str>, status: &str) -> Value {
     let clean = git(dir, &["status", "--porcelain"]).is_some_and(|s| s.is_empty());
     let repo = git(dir, &["remote", "get-url", "origin"]).unwrap_or_default();
     let repo = repo.trim_end_matches('/').trim_end_matches(".git").rsplit(['/', ':']).next().unwrap_or("").to_string();
-    if clean && !head.is_empty() && head == remote && before != Some(head.as_str()) {
+    let mut v = if clean && !head.is_empty() && head == remote && before != Some(head.as_str()) {
         json!({"message": format!("changes created and pushed to {repo}"), "pushed": true, "commit": head})
     } else if clean && head == remote {
         no("finished, nothing new to push: read the screen")
     } else {
         no(&format!("stopped without pushing to {branch}: read the screen"))
+    };
+    v["changes"] = changes(dir, before);
+    v
+}
+
+/// What the task changed in the clone: the commits since the task was sent, each with its
+/// message, and git's per-file summary against where it started (uncommitted work included).
+/// Null before the first task, or when nothing moved.
+fn changes(dir: &Path, before: Option<&str>) -> Value {
+    let Some(before) = before else { return Value::Null };
+    let log = git(dir, &["log", "--reverse", "--format=%H%x1f%B%x1e", &format!("{before}..HEAD")]).unwrap_or_default();
+    let commits: Vec<Value> = log.split('\x1e').filter_map(|c| c.trim().split_once('\x1f')).map(|(h, m)| json!({"commit": h, "message": m.trim()})).collect();
+    let files = git(dir, &["diff", "--stat=100", before]).unwrap_or_default();
+    if commits.is_empty() && files.is_empty() {
+        return Value::Null;
     }
+    json!({"commits": commits, "files": files})
+}
+
+/// Where a session's Claude leaves the report of its last task, outside the clone.
+fn report_path(app: &App, name: &str) -> PathBuf {
+    app.meta.with_file_name(format!("report-{name}.md"))
 }
 
 /// The keys without their secret: name, when, and the last 4 characters to tell them apart.
@@ -661,7 +688,10 @@ fn open_agent(app: &App, name: &str, input: &Value) -> Result<(String, String), 
     if !repo.is_empty() {
         brief += &format!("The repo {repo} is cloned here on branch {push}. For each task: do it end to end, run the project's checks and tests, commit, then git pull --rebase origin {push} && git push origin {push}. Do not open PRs. ");
     }
-    brief += "If a decision is only the owner's to make, say so plainly and stop. When a task is finished, say so in one line.\n\nTask:\n";
+    brief += "If a decision is only the owner's to make, say so plainly and stop. \
+        Write everything for a reader with ADHD: the point first, short lines, bullets, no paragraphs. \
+        When a task is finished, write a report to the file named at the end of the task (overwrite it) and print the same: \
+        line 1, what happened, under 15 words; then up to five bullets, each under 15 words: what changed and where (files), what was checked, what is left open or needs the owner. Nothing else.\n\nTask:\n";
     Ok((pane, brief))
 }
 
@@ -1260,8 +1290,16 @@ mod tests {
         assert_eq!(v["pushed"], true);
         assert_eq!(v["commit"], head);
         assert_eq!(outcome(&dir, Some(&head), "done")["message"], "finished, nothing new to push: read the screen");
+        assert_eq!(outcome(&dir, Some(&head), "done")["changes"], Value::Null);
         sh("echo x > f");
         assert_eq!(outcome(&dir, Some("0000"), "idle")["message"], "stopped without pushing to main: read the screen");
+        // What moved since the task was sent: the commits with their messages, and the files, uncommitted work included.
+        sh("git add f && git -c user.name=t -c user.email=t@t commit -q -m 'Add f' -m 'Because.' && echo y > g");
+        let c = changes(&dir, Some(&head));
+        assert_eq!(c["commits"][0]["message"], "Add f\n\nBecause.");
+        assert_eq!(c["commits"][0]["commit"], git(&dir, &["rev-parse", "HEAD"]).unwrap());
+        assert!(c["files"].as_str().unwrap().contains("f |"), "{c}");
+        assert_eq!(changes(&dir, None), Value::Null);
         assert_eq!(outcome(&dir, None, "blocked")["message"], "waiting for an answer: read the screen");
         let _ = fs::remove_dir_all(&dir);
     }

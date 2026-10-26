@@ -14,6 +14,10 @@ command -v opencode >/dev/null || [ -x ~/.opencode/bin/opencode ] || curl -fsSL 
 command -v codegraph >/dev/null || curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
 # ponytail: whiteboard is a desktop app; the synced Claude hooks call it, so no-op it here.
 [ -e ~/.local/bin/whiteboard ] || printf '#!/bin/sh\nexit 0\n' > ~/.local/bin/whiteboard && chmod +x ~/.local/bin/whiteboard
+# Every Claude here runs as `claude --dangerously-skip-permissions` (same mode, no dialog): nobody is
+# at the keyboard to answer prompts. sync.sh copies the laptop's settings over this file first.
+mkdir -p ~/.claude; f=~/.claude/settings.json; [ -s $f ] || echo {} > $f
+jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true' $f > $f.tmp && mv $f.tmp $f
 
 # Same herdr version as the laptop: the laptop's client talks to this server.
 want=${HERDR_VERSION:?pass HERDR_VERSION}
@@ -34,13 +38,17 @@ grep -q '^\[experimental\]' ~/.config/herdr/config.toml 2>/dev/null \
 # Linked laptops (systemd/femme-link.service) forward their herdr socket into ~/.config/herdr/remote
 # for the board. sshd replaces a stale socket on reconnect and drops a dead link (lid shut) in ~45 s.
 mkdir -p ~/.config/herdr/remote
+# Instinct's terminals run in a herdr session of their own (systemd/herdr-instinct.service), so a
+# laptop can list them as a machine tab of their own; the board lists them the same way as a
+# laptop's, tagged instinct, through this link.
+ln -sfn ~/.config/herdr/sessions/instinct/herdr.sock ~/.config/herdr/remote/instinct.sock
 printf 'StreamLocalBindUnlink yes\nClientAliveInterval 15\nClientAliveCountMax 3\n' | sudo tee /etc/ssh/sshd_config.d/20-femme-link.conf >/dev/null
 if sudo sshd -t; then sudo systemctl reload ssh; else sudo rm -f /etc/ssh/sshd_config.d/20-femme-link.conf; fi
 
 # `pc` (pc.sh): agents here build and test on the laptop, in the same synced folder, over that
 # same link (it also forwards the laptop's sshd as <hostname>.ssh; pc-setup.sh on the laptop).
 [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C femme-vps
-pc_host=${PC_HOST:-$(cd ~/.config/herdr/remote && ls *.sock 2>/dev/null | sed 's/\.sock$//' || :)}
+pc_host=${PC_HOST:-$(find ~/.config/herdr/remote -maxdepth 1 -type s -name '*.sock' -printf '%f\n' 2>/dev/null | sed 's/\.sock$//')}
 case $pc_host in
   '') echo "NOTE: no linked laptop yet, so no 'Host pc': run pc-setup.sh on it (or set PC_HOST in .env)" >&2 ;;
   *$'\n'*) echo "WARN: several laptops are linked: set PC_HOST in .env to the one pc should use" >&2 ;;
@@ -55,12 +63,36 @@ mkdir -p ~/.claude/rules && cp rules/pc.md ~/.claude/rules/femme-pc.md
   printf '<!-- femme pc start -->\n'; cat rules/pc.md; printf '<!-- femme pc end -->\n'
 } > ~/.codex/AGENTS.new && mv ~/.codex/AGENTS.new ~/.codex/AGENTS.md
 
-units="herdr-server herdr-notify"
+units="herdr-server herdr-instinct herdr-notify"
 if [ -n "${BOARD_URL:-}" ]; then
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).
   command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }
   # encode: the browser terminal polls the screen several times a second; compressed it is ~5x smaller.
-  printf '%s {\n\tencode zstd gzip\n\treverse_proxy 127.0.0.1:8787\n}\n' "${BOARD_URL#https://}" | sudo tee /etc/caddy/Caddyfile >/dev/null
+  # timeouts: the board takes one request at a time, so a client trickling a body may hold it 60 s, not forever.
+  # max_size: a 20 MB upload, base64'd. Headers: HSTS; no Referer, the magic link's token is in its URL.
+  sudo tee /etc/caddy/Caddyfile >/dev/null <<EOF
+{
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 60s
+		}
+	}
+}
+${BOARD_URL#https://} {
+	encode zstd gzip
+	request_body {
+		max_size 30MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		Referrer-Policy no-referrer
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+	}
+	reverse_proxy 127.0.0.1:8787
+}
+EOF
   sudo systemctl reload-or-restart caddy
   # Built here, not on the laptop, so a merge to main can deploy itself (deploy.sh).
   [ -x ~/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --no-modify-path
@@ -86,6 +118,12 @@ for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
 [ -z "${BOARD_URL:-}" ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
 systemctl --user daemon-reload
 systemctl --user enable --now $units
+# The plugin runs from this checkout (deploy.sh keeps it at main). sync.sh just copied the laptop's
+# plugins.json over ours, which points femme at the laptop's checkout path: relink when it differs.
+if [ "$(herdr plugin list --json 2>/dev/null | jq -r '.result.plugins[] | select(.plugin_id == "femme") | .plugin_root')" != "$PWD" ]; then
+  herdr plugin unlink femme >/dev/null 2>&1 || true
+  herdr plugin link "$PWD" >/dev/null || echo "WARN: could not link the femme plugin from $PWD" >&2
+fi
 systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker femme-cswap}
 herdr server reload-config >/dev/null 2>&1 || true
 systemctl --user is-active $units

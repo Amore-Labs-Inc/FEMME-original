@@ -1,0 +1,11 @@
+[Unit]
+Description=herdr session for Instinct's terminals (their own machine tab on a laptop)
+After=herdr-server.service
+
+[Service]
+ExecStart=%h/.local/bin/herdr --session instinct server
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

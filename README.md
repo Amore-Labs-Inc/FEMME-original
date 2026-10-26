@@ -22,7 +22,7 @@ ssh agentbox                                # one-time logins, credentials are n
 #   gh auth login && gh auth setup-git
 ```
 
-Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`). `.env` is gitignored and holds your IP and ntfy topic.
+Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`, `SPAWN_TYPES`). `.env` is gitignored and holds your IP and ntfy topic.
 
 ### Laptop
 
@@ -41,6 +41,12 @@ key = "prefix+shift+v"
 type = "plugin_action"
 command = "femme.fork-remote"
 description = "fork agent to VPS"
+
+[[keys.command]]
+key = "prefix+shift+d"
+type = "plugin_action"
+command = "femme.files"
+description = "drop box: files into the agent's folder"
 ```
 
 Local and VPS workspaces show side by side. Local ones die when the laptop sleeps; `prefix+shift+v` on a local agent forks it to the VPS and leaves the local one running:
@@ -54,6 +60,8 @@ Sync rules:
 - Deletions propagate both ways, like any other change.
 - Only folders inside `$HOME` are synced; an agent in `/tmp` gets an empty folder on the VPS.
 - `sh sync-dir.sh <dir>` syncs a folder without forking anything. `mutagen sync terminate <name>` stops it, and both copies stay.
+
+`prefix+shift+d` on a VPS agent opens **Files · drop box** beside it: the agent's folder, newest first. Drag a file from the laptop's file manager onto the box and it is uploaded into that folder: a spinner while it runs, ✓ once it is listed. The copy goes through the laptop's linked herdr (an `upload: …` workspace flashes there), so `femme-link` must be running; the box says `laptop not linked` otherwise. A dropped image takes herdr's own image bridge, and a file from a synced folder is copied on the VPS side. `q` closes the box. (`prefix+shift+f` is forkr's, hence `d`.)
 
 ### Work on PC files from the VPS
 
@@ -86,18 +94,55 @@ Trust: the VPS's key logs in to your laptop as you, so anything running as your 
 3. Add host: `darkwarro@<IP from .env>`, mosh on, command `herdr`.
 4. In ntfy, subscribe to the `NTFY_TOPIC` from `.env`. Anyone who knows the topic can read your pushes, so keep it secret.
 
+### The box's own AWS access
+
+`provision.sh` gives the instance the IAM role `femme`: launch, stop and terminate instances of the `SPAWN_TYPES` types in `REGION` only (plus the security groups, key pairs and tags that takes), no IAM. The credentials come from the instance metadata service and rotate themselves, so there is nothing to leak; but anything running on the box can use them, so the policy is the guard.
+
+After rerunning `./provision.sh`, remove whatever is in `~/.aws` on the VPS (a static key or the board's `aws login` session shadows the role): `aws logout`, or delete the files. Then `aws sts get-caller-identity` shows `assumed-role/femme/i-…`, and so does the board's accounts window.
+
+Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard instances" (vCPUs) for the region to e.g. 16. Add a Budgets email alert too, but alerts lag hours and stop nothing. Credits apply to the bill automatically.
+
 ## Issues board
 
 Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point an A record (DNS only) for `BOARD_URL`'s host at the VPS, rerun `./provision.sh` (opens 80/443) and `./sync.sh`.
 
-- Sign in with a magic link sent to `BOARD_EMAIL` (once, 15 minutes); the cookie lasts 7 days.
+- Sign in with a magic link sent to your address, one of those in `BOARD_EMAIL` (comma-separated; everyone on it gets the same full access). The link works once, for 15 minutes (one link a minute per client); the cookie lasts 7 days.
 - Add an issue: pick a repo, describe the work. The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
 - **Chat** on a card opens that agent's terminal: a real terminal (xterm.js) showing the pane's live screen in colour. Type straight into it (keys, arrows, Ctrl-C, paste); on a phone the key bar has Esc, Tab, arrows, Ctrl-C and Enter. Paste or drop an image or file (or use the upload button): it is saved to `~/.local/state/femme/uploads` (kept 7 days) and its path is typed in, which Claude Code attaches as an image. **End** closes the workspace.
-- **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME`, use it the same way, or close it.
+- **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME` (Claude's trust question on a folder's first visit is answered yes: the folder was yours to pick), use it the same way, or close it.
 - Linked laptops' workspaces are listed there too, tagged with the laptop's hostname, while it is awake. `femme-link.service` forwards the laptop's herdr socket to `~/.config/herdr/remote/<hostname>.sock` on the VPS over SSH. New terminals open on the VPS only, and uploads only reach VPS terminals. Anything running as your user on the VPS, agents included, can then type into the laptop's terminals.
 - Merging to `main` deploys itself: every 20 seconds `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Set both in `.env`.
+
+### Player reports
+
+The game server files players' bug reports on the board:
+
+```
+POST /api/reports
+Authorization: Bearer <~/.local/state/femme/report.token on the VPS>
+Content-Type: application/json
+{"title": "≤120 chars, optional", "text": "1-4000 chars", "png": "<base64 PNG, ≤6 MB>", "meta": {"any": "object ≤4 KB"}}
+→ 201 {"id": <issue id>}   400 bad field · 401 bad token · 413 body over 9 MB · 429 over the hourly limit
+```
+
+- `report.token` is created at the board's first start (mode 0600). It opens this route only; the worker token and a session never do.
+- The screenshot and the report go to `~/.local/state/femme/reports/` (kept, never purged). The issue body gives the worker's Claude the screenshot's path, the meta, and the player's text fenced as untrusted data. Signed in, the card's **screenshot** link shows it.
+- Reports land as **Player reports** (status `triage`), which the worker never starts. **Queue it** moves one to the queue (`open`); **Delete** drops it.
+- `.env`: `FEMME_REPORT_REPO` (default `Darkosxl/mksm-recomp`), `FEMME_REPORT_BASE` (the branch PRs start from and target, default `shaolin-monks-decomp`), `FEMME_REPORT_LIMIT` (reports per hour, all players together, default 30).
+
+### API for other agents
+
+Another agent (Instinct) gets one standing Claude Code session on the box, reused for all its tasks, so the board is not filled with one terminal per task. Make it a key in the accounts window (**API keys**, name it, copy the key: it is shown once) and hand over the key with `$BOARD_URL/api/openapi.json`, an OpenAPI 3 document written for a program to read: auth, each route with an example, errors, what is safe to retry. **revoke** next to a key ends it at once; keys live in `~/.local/state/femme/api-keys.json`.
+
+To push as the other person rather than as the box's GitHub login, put their GitHub account on the key: **connect GitHub** next to it shows a one-time code; they enter it at github.com/login/device signed in as themselves (the usual `gh auth login`, in a config dir of its own, so the box's login is untouched), and the key gets their token, name and GitHub noreply address. Or paste a token when making the key (a fine-grained PAT for the repo, Contents: read and write; the name and address come from GitHub). The repos that key's sessions clone are fetched and pushed with the token (it sits in that clone's `.git/config`, so the session's Claude can read it: it works on their behalf anyway) and commits carry the name. Set again on every open, so connecting again takes over; a key without an account hands the clone back to the box's `gh`.
+
+- `POST /api/agents/<name>` `{"text": "...", "repo": "Amore-Labs-Inc/Exposure"}` sends a task. When nothing runs under that name, the repo is cloned to `~/femme-work/<name>`, Claude starts there in a workspace labelled with the name (its trust question answered yes: the folder was the caller's choice), and a standing brief goes before the text: do each task end to end and check it, but leave the changes uncommitted; no PRs. The session shows on the Terminals tab like any other, tagged `instinct`, so you can watch or step in. These sessions run in a herdr session of their own (`instinct`, kept up by `herdr-instinct.service`): on the laptop, `herdr machine add agentbox --label "Instinct · Onur" --remote-session instinct` lists them as a machine tab of their own next to agentbox.
+- `POST /api/agents/<name>/push` is the owner's yes: Claude commits the task's changes as one commit and pushes onto `push` (default `main`, set when the session was opened). `POST /api/agents/<name>/discard` is the no: the changes are thrown away. Both take an optional `{"text": "..."}` note from the owner. So a task is: send it, read the report, relay the owner's answer.
+- `GET /api/agents/<name>` returns `status`, the screen as text, and once Claude stopped a `message` read off the clone: `changes created and pushed to Exposure` (with `pushed: true` and the commit) when the tree is clean and HEAD is on the branch and moved since the task was sent; `changes ready, not pushed to main: read the report, then POST /api/agents/<name>/push or /discard` at the normal end of a task; or that it finished with nothing new. `report` is Claude's own account of the task, written to `~/.local/state/femme/report-<name>.md` when it finishes, for a reader who is not a programmer: the brief asks for everything in a form a reader with ADHD takes in at a glance (the point first, short lines, bullets) and the report to be one line on what the change does for them plus up to five bullets on what they will notice, what was checked and what is left open or needs their decision, with no file names or code. `DELETE` closes the session.
+- A key also reaches the other terminals: `GET /api/terminals` lists every one (the box's, its own, the laptop's while linked), `GET /api/terminals/<pane>` reads one (status and screen as text), `POST /api/terminals/<pane>/prompt` sends the agent in it a whole message, and `/api/terminals/<pane>/input` types raw keys (answering Claude's own prompts). So Instinct can ask a running session what it did, or hand it a task, and read the answer off its screen; it cannot open or close terminals here, only its own under `/api/agents`. A key sees every screen, the laptop's included while it is linked.
+- A key reaches those routes, `/api/ping`, `/api/openapi.json` and `/api/agents/<name>` with its `/push` and `/discard`. Everything else answers 403 to it.
 
 ### Accounts
 
@@ -123,10 +168,12 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units; builds the board. |
 | `deploy.sh` | VPS | On a timer: deploys `main` after a merge. |
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
-| `fork-remote.sh` | laptop | The herdr plugin action. |
+| `fork-remote.sh` | laptop | The herdr plugin action: fork to the VPS. |
+| `files.sh`, `files-pane.sh` | VPS | The plugin's drop box: action and pane. Files dragged from the laptop land in the agent's folder. |
 | `board/` | VPS | The issues board server (Rust). |
 | `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |
 | `systemd/femme-cswap.service` | VPS | Auto-rotates Claude accounts at `CAP`. |
+| `systemd/herdr-instinct.service` | VPS | The herdr session Instinct's terminals run in. |
 | `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
 | `systemd/femme-link.service` | laptop | Puts the laptop's herdr terminals on the board and its sshd within reach of `pc`. |
 

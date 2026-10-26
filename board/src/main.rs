@@ -501,7 +501,9 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             if let Some(kind) = input["agent"].as_str().filter(|k| ["claude", "codex", "pi"].contains(k)) {
                 wait_for_shell(herdr, &pane);
                 let name = format!("t-{}", &random_hex()[..8]);
-                let _ = herdr(&["agent", "start", &name, "--kind", kind, "--pane", &pane, "--timeout", "60000"]);
+                if herdr(&["agent", "start", &name, "--kind", kind, "--pane", &pane, "--timeout", "60000"]).is_err() {
+                    trust_folder(herdr, &pane);
+                }
                 let _ = herdr(&["agent", "rename", &pane, "--clear"]);
             }
             ok(json!({"pane_id": pane}))
@@ -870,12 +872,8 @@ fn open_agent(app: &App, name: &str, input: &Value, caller: Option<&Value>) -> R
     }
     wait_for_shell(instinct, &pane);
     if let Err(e) = instinct(&["agent", "start", name, "--kind", "claude", "--pane", &pane, "--timeout", "60000"]) {
-        // Claude's "do you trust this folder?" on its first visit: the folder is the caller's own
-        // clone (or choice), so yes; then Claude finishes starting and herdr picks it up by name.
-        let screen = instinct(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
-        let trusted = screen.contains("trust this folder")
-            && instinct(&["pane", "send-keys", &pane, "down", "enter"]).is_ok()
-            && (0..60).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "idle")));
+        // Claude's trust question; then Claude finishes starting and herdr picks it up by name.
+        let trusted = trust_folder(instinct, &pane) && (0..60).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "idle")));
         if !trusted {
             let _ = instinct(&["workspace", "close", pane.split(':').next().unwrap_or("")]);
             return Err(err(502, &format!("Claude did not start: {e}")));
@@ -1128,6 +1126,14 @@ fn valid_id(id: &str, pane: bool) -> bool {
 fn pane_status(sock: Option<&Path>, pane: &str) -> Option<String> {
     let v: Value = serde_json::from_str(&herdr_on(sock, &["agent", "get", pane]).ok()?).ok()?;
     v["result"]["agent"]["agent_status"].as_str().map(String::from)
+}
+
+/// Claude's "do you trust this folder?" on a folder's first visit, which holds up its start (herdr
+/// reports the agent blocked during startup): yes, the folder was the owner's (or the caller's)
+/// own choice under home. True when the question was on screen and answered.
+fn trust_folder(h: fn(&[&str]) -> Result<String, String>, pane: &str) -> bool {
+    h(&["pane", "read", pane, "--source", "visible", "--format", "text"]).is_ok_and(|s| s.contains("trust this folder"))
+        && h(&["pane", "send-keys", pane, "down", "enter"]).is_ok()
 }
 
 fn wait_for_shell(h: fn(&[&str]) -> Result<String, String>, pane: &str) {

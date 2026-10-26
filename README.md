@@ -33,7 +33,7 @@ cp systemd/mutagen.service ~/.config/systemd/user/ && systemctl --user enable --
 cp systemd/femme-link.service ~/.config/systemd/user/ && systemctl --user enable --now femme-link  # laptop terminals on the board
 ```
 
-Add to `~/.config/herdr/config.toml`, then `herdr server reload-config`:
+Add to `~/.config/herdr/config.toml`, then `./sync.sh`. A `[[keys.command]]` binding belongs to the machine selected in herdr, not to the client: the fork key is used on Local panes, so the laptop's own copy serves it (`herdr server reload-config` is enough), but the drop box key is pressed on agentbox panes, so it must be in the VPS's `config.toml` too, which `sync.sh` copies over and reloads (herdr issue #5183). `prefix+?` lists the selected machine's keys.
 
 ```toml
 [[keys.command]]

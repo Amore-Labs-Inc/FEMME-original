@@ -41,6 +41,12 @@ key = "prefix+shift+v"
 type = "plugin_action"
 command = "femme.fork-remote"
 description = "fork agent to VPS"
+
+[[keys.command]]
+key = "prefix+shift+d"
+type = "plugin_action"
+command = "femme.files"
+description = "drop box: files into the agent's folder"
 ```
 
 Local and VPS workspaces show side by side. Local ones die when the laptop sleeps; `prefix+shift+v` on a local agent forks it to the VPS and leaves the local one running:
@@ -54,6 +60,8 @@ Sync rules:
 - Deletions propagate both ways, like any other change.
 - Only folders inside `$HOME` are synced; an agent in `/tmp` gets an empty folder on the VPS.
 - `sh sync-dir.sh <dir>` syncs a folder without forking anything. `mutagen sync terminate <name>` stops it, and both copies stay.
+
+`prefix+shift+d` on a VPS agent opens **Files · drop box** beside it: the agent's folder, newest first. Drag a file from the laptop's file manager onto the box and it is uploaded into that folder: a spinner while it runs, ✓ once it is listed. The copy goes through the laptop's linked herdr (an `upload: …` workspace flashes there), so `femme-link` must be running; the box says `laptop not linked` otherwise. A dropped image takes herdr's own image bridge, and a file from a synced folder is copied on the VPS side. `q` closes the box. (`prefix+shift+f` is forkr's, hence `d`.)
 
 ### iPhone
 
@@ -133,7 +141,8 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units; builds the board. |
 | `deploy.sh` | VPS | On a timer: deploys `main` after a merge. |
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
-| `fork-remote.sh` | laptop | The herdr plugin action. |
+| `fork-remote.sh` | laptop | The herdr plugin action: fork to the VPS. |
+| `files.sh`, `files-pane.sh` | VPS | The plugin's drop box: action and pane. Files dragged from the laptop land in the agent's folder. |
 | `board/` | VPS | The issues board server (Rust). |
 | `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |
 | `systemd/femme-cswap.service` | VPS | Auto-rotates Claude accounts at `CAP`. |

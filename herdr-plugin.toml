@@ -11,3 +11,17 @@ title = "Fork agent to VPS"
 description = "Copy the focused agent's repo and conversation to the VPS and continue it in a new workspace there"
 contexts = ["pane"]
 command = ["sh", "fork-remote.sh"]
+
+[[actions]]
+id = "files"
+title = "Files · drop box"
+description = "Open a drop box beside the focused agent: a file dragged from the laptop onto it lands in the agent's folder here"
+contexts = ["pane"]
+command = ["sh", "files.sh"]
+
+# The pane files.sh opens. bash, not sh: the loop needs read -t, which dash lacks.
+[[panes]]
+id = "files"
+title = "Files · drop box"
+placement = "split"
+command = ["bash", "files-pane.sh"]

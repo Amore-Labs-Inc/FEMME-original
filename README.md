@@ -43,7 +43,7 @@ command = "femme.fork-remote"
 description = "fork agent to VPS"
 
 [[keys.command]]
-key = "prefix+shift+d"
+key = "prefix+u"
 type = "plugin_action"
 command = "femme.files"
 description = "drop box: files into the agent's folder"
@@ -61,7 +61,7 @@ Sync rules:
 - Only folders inside `$HOME` are synced; an agent in `/tmp` gets an empty folder on the VPS.
 - `sh sync-dir.sh <dir>` syncs a folder without forking anything. `mutagen sync terminate <name>` stops it, and both copies stay.
 
-`prefix+shift+d` on a VPS agent opens **Files · drop box** beside it: the agent's folder, newest first. Drag a file from the laptop's file manager onto the box and it is uploaded into that folder: a spinner while it runs, ✓ once it is listed. The copy goes through the laptop's linked herdr (an `upload: …` workspace flashes there), so `femme-link` must be running; the box says `laptop not linked` otherwise. A drop lands in the focused pane, so the box must be it (herdr's blue border): unfocused, it dims and shows a yellow *click here first* bar. A dropped image takes herdr's own image bridge, and a file from a synced folder is copied on the VPS side. `q` closes the box. (`prefix+shift+f` is forkr's, hence `d`.)
+`prefix+u` (the prefix is `ctrl+b` unless `keys.prefix` says otherwise) on a VPS agent opens **Files · drop box** beside it: the agent's folder, newest first. Drag a file from the laptop's file manager onto the box and it is uploaded into that folder: a spinner while it runs, ✓ once it is listed. The copy goes through the laptop's linked herdr (an `upload: …` workspace flashes there), so `femme-link` must be running; the box says `laptop not linked` otherwise. A drop lands in the focused pane, so the box must be it (herdr's blue border): unfocused, it dims and shows a yellow *click here first* bar. A dropped image takes herdr's own image bridge, and a file from a synced folder is copied on the VPS side. `q` closes the box.
 
 ### Work on PC files from the VPS
 

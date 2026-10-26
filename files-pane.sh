@@ -25,11 +25,17 @@ else
   trap 'rm -rf "$st"' EXIT
 fi
 
+# A drop lands in the focused pane, so the box must be it: when it is not, the listing dims and the
+# footer turns into a yellow "click here first" bar; focused, the footer is green.
+focused() { [ -z "${HERDR_PANE_ID:-}" ] || "$herdr" pane list 2>/dev/null | jq -e --arg p "$HERDR_PANE_ID" '.result.panes[] | select(.pane_id == $p) | .focused' >/dev/null; }
+
 render() {
-  local rows cols n f state rest now
+  local rows cols n f state rest now dim=
   read -r rows cols < <(stty size 2>/dev/null || echo 24 80)
   n=$((rows - 4)); [ "$n" -gt 0 ] || n=1
-  printf '\033[H\033[2J\033[1m%s\033[0m\n' "${dir/#$HOME/\~}"
+  focused && foot=$'\033[1;32m● drop a file from the laptop here\033[0m\033[2m · q closes\033[0m' \
+          || { dim=$'\033[2m'; foot=$'\033[30;43m click here first \033[0m\033[33m a drop lands in the focused pane\033[0m'; }
+  printf '\033[H\033[2J\033[1m%s\033[0m\n%s' "${dir/#$HOME/\~}" "$dim"
   # Newest first, so what just landed is the top line.
   find . -mindepth 1 -maxdepth 1 -printf '%T@\t%TH:%TM\t%s\t%y\t%P\n' | sort -rn | head -n "$n" \
     | awk -F'\t' -v w="$cols" '{ s = $3; u = " "; if (s >= 1024) { s /= 1024; u = "K" } if (s >= 1024) { s /= 1024; u = "M" } if (s >= 1024) { s /= 1024; u = "G" }
@@ -44,7 +50,7 @@ render() {
       err) if [ $((now - $(stat -c %Y "$f"))) -lt 8 ]; then printf '✗ %s\n' "$rest"; else rm -f "$f"; fi ;;
     esac
   done
-  printf '\033[%d;1H\033[2mdrop a file from the laptop here · q closes\033[0m' "$rows"
+  printf '\033[0m\033[%d;1H%s' "$rows" "$foot"
 }
 
 # The laptop's herdr, under timeout: a link that died with the lid shut (sshd drops it in ~45 s)

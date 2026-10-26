@@ -444,8 +444,9 @@
   // Pasted or dropped files (a screenshot, a PDF) go to the box and their path is typed in;
   // Claude Code attaches a pasted image path as the image itself.
   async function upload(files) {
-    // ponytail: files land on the VPS, so a linked laptop's terminal can't open them.
-    if (chatPane.includes('~')) return say('files only reach VPS terminals', true);
+    // ponytail: files land on the VPS, so a linked laptop's terminal can't open them (Instinct's
+    // session is tagged too, but runs here).
+    if (chatPane.includes('~') && !chatPane.startsWith('instinct~')) return say('files only reach VPS terminals', true);
     for (const f of files) {
       if (f.size > 20 << 20) { say(`${f.name}: files up to 20 MB`, true); continue; }
       say(`uploading ${f.name || 'image'}…`);

@@ -38,10 +38,14 @@ grep -q '^\[experimental\]' ~/.config/herdr/config.toml 2>/dev/null \
 # Linked laptops (systemd/femme-link.service) forward their herdr socket into ~/.config/herdr/remote
 # for the board. sshd replaces a stale socket on reconnect and drops a dead link (lid shut) in ~45 s.
 mkdir -p ~/.config/herdr/remote
+# Instinct's terminals run in a herdr session of their own (systemd/herdr-instinct.service), so a
+# laptop can list them as a machine tab of their own; the board lists them the same way as a
+# laptop's, tagged instinct, through this link.
+ln -sfn ~/.config/herdr/sessions/instinct/herdr.sock ~/.config/herdr/remote/instinct.sock
 printf 'StreamLocalBindUnlink yes\nClientAliveInterval 15\nClientAliveCountMax 3\n' | sudo tee /etc/ssh/sshd_config.d/20-femme-link.conf >/dev/null
 if sudo sshd -t; then sudo systemctl reload ssh; else sudo rm -f /etc/ssh/sshd_config.d/20-femme-link.conf; fi
 
-units="herdr-server herdr-notify"
+units="herdr-server herdr-instinct herdr-notify"
 if [ -n "${BOARD_URL:-}" ]; then
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).
   command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }

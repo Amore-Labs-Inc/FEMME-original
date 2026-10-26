@@ -63,6 +63,30 @@ Sync rules:
 
 `prefix+shift+d` on a VPS agent opens **Files · drop box** beside it: the agent's folder, newest first. Drag a file from the laptop's file manager onto the box and it is uploaded into that folder: a spinner while it runs, ✓ once it is listed. The copy goes through the laptop's linked herdr (an `upload: …` workspace flashes there), so `femme-link` must be running; the box says `laptop not linked` otherwise. A dropped image takes herdr's own image bridge, and a file from a synced folder is copied on the VPS side. `q` closes the box. (`prefix+shift+f` is forkr's, hence `d`.)
 
+### Work on PC files from the VPS
+
+Agents run on the VPS (its RAM, its account rotation) while the heavy files and the toolchain stay on the laptop: the folder's text syncs as above, and the agent builds on the laptop with `pc <command>`.
+
+```sh
+./pc-setup.sh                               # once, on the laptop: sshd on 127.0.0.1 only, the VPS's key, the link forwards it
+```
+
+Then per folder, on the laptop: put what must not leave it in `<dir>/.femme-ignore`, one Mutagen pattern per line, and sync it (`sh sync-dir.sh <dir>`, or `prefix+shift+v` on an agent there):
+
+```
+# decomp: the disc image, the build and the Ghidra project stay here
+*.iso
+baserom*
+/build
+/expected
+*.gpr
+*.rep
+```
+
+Open a terminal on the board in that folder (Claude or Codex; both get the rule from `rules/pc.md`). The agent edits on the VPS and runs `pc make` (or `pc 'make && ./check.sh'`, or just `pc` for a shell): `pc` flushes the sync, runs the line on the laptop in the same folder through its login shell, and flushes again, so the build sees the edits and the results come back. Asleep or away laptop: edits go on, only `pc` says `laptop not linked`. Ignores are fixed when the session is made: `mutagen sync terminate <name>`, edit `.femme-ignore`, sync again. `PC_HOST` in `.env` picks the laptop when several are linked.
+
+Trust: the VPS's key logs in to your laptop as you, so anything running as your user on the VPS can run commands there (as it can already type into the laptop's terminals, above). The laptop's sshd is reachable only through the link the laptop itself opens.
+
 ### iPhone
 
 1. Install **Moshi** (or Blink Shell) and **ntfy**.
@@ -137,7 +161,10 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `provision.sh` | laptop | Creates the instance. Safe to rerun; reuses everything tagged `femme`. |
 | `cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, mosh, 8 GB swap, linger. |
 | `sync.sh` | laptop | Copies config: `~/.claude` minus credentials and history, herdr, mise. Merges onboarding, trust and portable MCP servers into the VPS `~/.claude.json`. |
-| `sync-dir.sh` | laptop | Puts one folder in live two-way sync with the VPS. |
+| `sync-dir.sh` | laptop | Puts one folder in live two-way sync with the VPS, minus its `.femme-ignore`. |
+| `pc-setup.sh` | laptop | Lets `pc` on the VPS run commands here. |
+| `pc.sh` | VPS | `pc <command>`: runs it on the laptop in the same folder, sync flushed around it. |
+| `rules/pc.md` | VPS | Tells Claude and Codex when to use `pc`. |
 | `bootstrap.sh` | VPS | Installs mise toolchains, agents, herdr and the systemd units; builds the board. |
 | `deploy.sh` | VPS | On a timer: deploys `main` after a merge. |
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
@@ -148,7 +175,7 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `systemd/femme-cswap.service` | VPS | Auto-rotates Claude accounts at `CAP`. |
 | `systemd/herdr-instinct.service` | VPS | The herdr session Instinct's terminals run in. |
 | `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
-| `systemd/femme-link.service` | laptop | Puts the laptop's herdr terminals on the board. |
+| `systemd/femme-link.service` | laptop | Puts the laptop's herdr terminals on the board and its sshd within reach of `pc`. |
 
 ## Cost
 

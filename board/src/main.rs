@@ -295,7 +295,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
     let caller = app.keys.iter().find(|k| !key.is_empty() && same(text(k, "key").as_bytes(), key.as_bytes())).cloned();
     if caller.is_some() {
         if !api_route(&method, &parts) {
-            return err(403, "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name}, its /push and /discard, and /api/terminals/{pane}/input");
+            return err(403, "this key only reaches /api/ping, /api/openapi.json, /api/agents/{name} with its /push and /discard, /api/terminals, and /api/terminals/{pane} with its /prompt and /input");
         }
     } else if !signed_in(req, app) {
         return match parts.as_slice() {
@@ -518,6 +518,24 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                 Err(e) => err(404, &e),
             }
         }
+        // For another agent's key (the owner has the page): a terminal's status and screen as text,
+        // and a whole message to the agent in it, pasted and submitted by herdr; raw keys are /input.
+        (Method::Get, ["api", "terminals", pane]) => {
+            let Some((sock, pane)) = on_machine(&app.home, pane, true) else { return err(404, "not found") };
+            match herdr_on(sock.as_deref(), &["pane", "read", pane, "--source", "visible", "--format", "text"]) {
+                Ok(screen) => ok(json!({"status": pane_status(sock.as_deref(), pane), "screen": screen})),
+                Err(e) => err(404, &e),
+            }
+        }
+        (Method::Post, ["api", "terminals", pane, "prompt"]) => {
+            let Some((sock, pane)) = on_machine(&app.home, pane, true) else { return err(404, "not found") };
+            let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
+            let text = input["text"].as_str().unwrap_or("").replace('\0', "");
+            if text.is_empty() || text.len() > 100_000 {
+                return err(400, "text: 1 to 100000 bytes");
+            }
+            herdr_on(sock.as_deref(), &["agent", "prompt", pane, &text]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(409, &e))
+        }
         (Method::Post, ["api", "terminals", pane, "input"]) => {
             let Some((sock, pane)) = on_machine(&app.home, pane, true) else { return err(404, "not found") };
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
@@ -618,7 +636,11 @@ fn api_route(method: &Method, parts: &[&str]) -> bool {
     use Method::*;
     matches!(
         (method, parts),
-        (Get, ["api", "ping" | "openapi.json"]) | (Get | Post | Delete, ["api", "agents", _]) | (Post, ["api", "agents", _, "push" | "discard"]) | (Post, ["api", "terminals", _, "input"])
+        (Get, ["api", "ping" | "openapi.json" | "terminals"])
+            | (Get | Post | Delete, ["api", "agents", _])
+            | (Post, ["api", "agents", _, "push" | "discard"])
+            | (Get, ["api", "terminals", _])
+            | (Post, ["api", "terminals", _, "prompt" | "input"])
     )
 }
 
@@ -1462,12 +1484,13 @@ mod tests {
         for (m, p) in [
             (Get, "api/ping"), (Get, "api/openapi.json"), (Get, "api/agents/instinct"), (Post, "api/agents/instinct"),
             (Delete, "api/agents/instinct"), (Post, "api/agents/instinct/push"), (Post, "api/agents/instinct/discard"), (Post, "api/terminals/w2:p1/input"),
+            (Get, "api/terminals"), (Get, "api/terminals/w2:p1"), (Get, "api/terminals/Omarchy~w2:p1"), (Post, "api/terminals/w2:p1/prompt"),
         ] {
             assert!(api_route(&m, &p.split('/').collect::<Vec<_>>()), "{m} {p} should be open to the key");
         }
         for (m, p) in [
             (Get, ""), (Get, "api/issues"), (Post, "api/issues"), (Get, "api/accounts"), (Post, "api/accounts/switch"),
-            (Post, "api/accounts/claude/login"), (Get, "api/terminals"), (Post, "api/terminals"), (Delete, "api/terminals/w2"),
+            (Post, "api/accounts/claude/login"), (Post, "api/terminals"), (Delete, "api/terminals/w2"), (Post, "api/terminals/w2:p1"),
             (Get, "api/terminals/w2:p1/screen"), (Post, "api/terminals/upload"), (Get, "api/meta"), (Delete, "api/deploy"),
             (Post, "api/logout"), (Get, "reports/x.png"), (Patch, "api/agents/instinct"), (Get, "api/keys"), (Post, "api/keys"),
             (Delete, "api/keys/instinct"),

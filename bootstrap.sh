@@ -100,6 +100,12 @@ for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
 [ -z "${BOARD_URL:-}" ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
 systemctl --user daemon-reload
 systemctl --user enable --now $units
+# The plugin runs from this checkout (deploy.sh keeps it at main). sync.sh just copied the laptop's
+# plugins.json over ours, which points femme at the laptop's checkout path: relink when it differs.
+if [ "$(herdr plugin list --json 2>/dev/null | jq -r '.result.plugins[] | select(.plugin_id == "femme") | .plugin_root')" != "$PWD" ]; then
+  herdr plugin unlink femme >/dev/null 2>&1 || true
+  herdr plugin link "$PWD" >/dev/null || echo "WARN: could not link the femme plugin from $PWD" >&2
+fi
 systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker femme-cswap}
 herdr server reload-config >/dev/null 2>&1 || true
 systemctl --user is-active $units

@@ -16,12 +16,12 @@
       "Error": {
         "type": "object",
         "required": ["error"],
-        "properties": { "error": { "type": "string", "example": "text: 1 to 100000 bytes" }, "pane_id": { "type": "string", "description": "On 409/502 from POST when the terminal exists anyway.", "example": "w9:p1" } }
+        "properties": { "error": { "type": "string", "example": "text: 1 to 100000 bytes" }, "pane_id": { "type": "string", "description": "On 409/502 from POST when the terminal exists anyway.", "example": "instinct~w9:p1" } }
       },
       "Agent": {
         "type": "object",
         "properties": {
-          "pane_id": { "type": "string", "description": "The terminal Claude runs in; the id for /api/terminals/{pane_id}/input.", "example": "w9:p1" },
+          "pane_id": { "type": "string", "description": "The terminal Claude runs in; the id for /api/terminals/{pane_id}/input.", "example": "instinct~w9:p1" },
           "status": { "type": "string", "enum": ["working", "idle", "done", "blocked", "unknown"], "description": "working: busy. idle or done: finished its turn, see `message` and `screen`. blocked: waiting for an answer (a yes/no, a choice): read `screen` and answer through /input." },
           "message": { "type": "string", "nullable": true, "description": "null while working. Once stopped: `changes created and pushed to <repo>` when the clone is clean, on its remote branch and moved since the task was sent; `finished, nothing new to push: read the screen`; `changes ready, not pushed to <branch>: read the report, then POST /api/agents/<name>/push or /discard` when the tree has changes or commits not on the remote (the normal end of a task);`waiting for an answer: read the screen` when blocked; `finished: read the screen` for a session without a repo.", "example": "changes created and pushed to Exposure" },
           "pushed": { "type": "boolean", "description": "true exactly when `message` reports a push.", "example": true },
@@ -67,7 +67,7 @@
         "x-example-request": "curl -H 'Authorization: Bearer $KEY' {BOARD_URL}/api/agents/instinct",
         "responses": {
           "200": { "description": "Running", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Agent" },
-            "example": { "pane_id": "w9:p1", "status": "idle", "message": "changes ready, not pushed to main: read the report, then POST /api/agents/instinct/push or /discard", "pushed": false, "report": "The site now tells the load balancer it is alive.\n- A new address answers \"ok\" whenever the site is up\n- Checked: the whole test suite passes\n- Nothing is live yet: say push or discard", "screen": "● The site now tells the load balancer it is alive.\n  - A new address answers \"ok\" whenever the site is up\n  - Checked: the whole test suite passes\n  - Nothing is live yet: say push or discard\n\n> " } } } },
+            "example": { "pane_id": "instinct~w9:p1", "status": "idle", "message": "changes ready, not pushed to main: read the report, then POST /api/agents/instinct/push or /discard", "pushed": false, "report": "The site now tells the load balancer it is alive.\n- A new address answers \"ok\" whenever the site is up\n- Checked: the whole test suite passes\n- Nothing is live yet: say push or discard", "screen": "● The site now tells the load balancer it is alive.\n  - A new address answers \"ok\" whenever the site is up\n  - Checked: the whole test suite passes\n  - Nothing is live yet: say push or discard\n\n> " } } } },
           "400": { "$ref": "#/components/responses/400" },
           "401": { "$ref": "#/components/responses/401" },
           "404": { "$ref": "#/components/responses/404" }
@@ -84,10 +84,10 @@
               "cwd": { "type": "string", "description": "Only read when opening, without `repo`: a folder under the box's home. Default: home." } } },
             "example": { "text": "Add GET /health returning {\"ok\":true} to the API, with a test.", "repo": "Amore-Labs-Inc/Exposure", "push": "main" } } } },
         "responses": {
-          "200": { "description": "Submitted; Claude is on it.", "content": { "application/json": { "example": { "pane_id": "w9:p1", "status": "working" } } } },
+          "200": { "description": "Submitted; Claude is on it.", "content": { "application/json": { "example": { "pane_id": "instinct~w9:p1", "status": "working" } } } },
           "400": { "$ref": "#/components/responses/400" },
           "401": { "$ref": "#/components/responses/401" },
-          "409": { "description": "Claude cannot take a message now (blocked on a question, or still starting). Read GET's screen.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "agent_blocked", "pane_id": "w9:p1" } } } },
+          "409": { "description": "Claude cannot take a message now (blocked on a question, or still starting). Read GET's screen.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "agent_blocked", "pane_id": "instinct~w9:p1" } } } },
           "415": { "$ref": "#/components/responses/415" },
           "502": { "description": "Could not open: the clone failed (repo name, access), the terminal did not open, or Claude did not start. Nothing is left running.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" }, "example": { "error": "could not clone Amore-Labs-Inc/Exposure" } } } }
         }
@@ -111,11 +111,11 @@
         "x-example-request": "curl -X POST -H 'Authorization: Bearer $KEY' -H 'Content-Type: application/json' {BOARD_URL}/api/agents/instinct/push -d '{}'",
         "requestBody": { "required": true, "description": "JSON, `{}` when there is nothing to add (every POST needs `Content-Type: application/json`).", "content": { "application/json": { "schema": { "type": "object", "properties": { "text": { "type": "string", "maxLength": 10000, "description": "Optional note from the owner." } } }, "example": {} } } },
         "responses": {
-          "200": { "description": "Sent; Claude is committing and pushing.", "content": { "application/json": { "example": { "pane_id": "w9:p1", "status": "working" } } } },
+          "200": { "description": "Sent; Claude is committing and pushing.", "content": { "application/json": { "example": { "pane_id": "instinct~w9:p1", "status": "working" } } } },
           "400": { "description": "The session has no repo (opened without `repo`).", "content": { "application/json": { "example": { "error": "this session has no repo" } } } },
           "401": { "$ref": "#/components/responses/401" },
           "404": { "$ref": "#/components/responses/404" },
-          "409": { "description": "Claude cannot take a message now (blocked on a question, or still working): read `screen`.", "content": { "application/json": { "example": { "error": "agent_not_ready", "pane_id": "w9:p1" } } } }
+          "409": { "description": "Claude cannot take a message now (blocked on a question, or still working): read `screen`.", "content": { "application/json": { "example": { "error": "agent_not_ready", "pane_id": "instinct~w9:p1" } } } }
         }
       }
     },
@@ -127,20 +127,20 @@
         "x-example-request": "curl -X POST -H 'Authorization: Bearer $KEY' -H 'Content-Type: application/json' {BOARD_URL}/api/agents/instinct/discard -d '{\"text\":\"not now, keep the old behaviour\"}'",
         "requestBody": { "required": true, "description": "JSON, `{}` when there is nothing to add (every POST needs `Content-Type: application/json`).", "content": { "application/json": { "schema": { "type": "object", "properties": { "text": { "type": "string", "maxLength": 10000 } } }, "example": { "text": "not now, keep the old behaviour" } } } },
         "responses": {
-          "200": { "description": "Sent; Claude is discarding.", "content": { "application/json": { "example": { "pane_id": "w9:p1", "status": "working" } } } },
+          "200": { "description": "Sent; Claude is discarding.", "content": { "application/json": { "example": { "pane_id": "instinct~w9:p1", "status": "working" } } } },
           "400": { "description": "The session has no repo.", "content": { "application/json": { "example": { "error": "this session has no repo" } } } },
           "401": { "$ref": "#/components/responses/401" },
           "404": { "$ref": "#/components/responses/404" },
-          "409": { "description": "Claude cannot take a message now: read `screen`.", "content": { "application/json": { "example": { "error": "agent_not_ready", "pane_id": "w9:p1" } } } }
+          "409": { "description": "Claude cannot take a message now: read `screen`.", "content": { "application/json": { "example": { "error": "agent_not_ready", "pane_id": "instinct~w9:p1" } } } }
         }
       }
     },
     "/api/terminals/{pane_id}/input": {
-      "parameters": [{ "name": "pane_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^w[A-Za-z0-9]+:p[A-Za-z0-9]+$" }, "description": "From GET /api/agents/{name}.", "example": "w9:p1" }],
+      "parameters": [{ "name": "pane_id", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^(instinct~)?w[A-Za-z0-9]+:p[A-Za-z0-9]+$" }, "description": "From GET /api/agents/{name} (the instinct~ prefix is the session the terminal is in).", "example": "instinct~w9:p1" }],
       "post": {
         "summary": "Type raw keys into the session's terminal",
         "description": "Mutating, not idempotent. For answering Claude's own prompts when `status` is `blocked`. `data` is typed as is: `\\r` is Enter, `\\u001b` Escape, `\\u0003` Ctrl-C; `y\\r` answers a yes/no, `2\\r` picks option 2. For a whole message use POST /api/agents/{name} instead.",
-        "x-example-request": "curl -X POST -H 'Authorization: Bearer $KEY' -H 'Content-Type: application/json' -d '{\"data\":\"y\\r\"}' {BOARD_URL}/api/terminals/w9:p1/input",
+        "x-example-request": "curl -X POST -H 'Authorization: Bearer $KEY' -H 'Content-Type: application/json' -d '{\"data\":\"y\\r\"}' {BOARD_URL}/api/terminals/instinct~w9:p1/input",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "type": "string", "minLength": 1, "maxLength": 100000 } } }, "example": { "data": "y\r" } } } },
         "responses": {
           "200": { "description": "Typed", "content": { "application/json": { "example": { "ok": true } } } },

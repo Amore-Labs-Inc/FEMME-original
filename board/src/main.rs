@@ -33,6 +33,7 @@ const MAX_UPLOAD: u64 = 20 << 20; // a pasted screenshot or file, before base64
 const UPLOAD_DAYS: u64 = 7;
 const SESSION_SECS: u64 = 7 * 86400;
 const LINK_SECS: u64 = 15 * 60;
+const INSTINCT: &str = "instinct"; // the herdr session Instinct's terminals live in, see instinct()
 // triage: a player report waiting for you to queue it (as open); the worker never starts it.
 const STATUSES: &[&str] = &["triage", "open", "working", "waiting", "paused", "pr", "done", "failed"];
 const REPORT_BODY: u64 = 9 << 20; // a 6 MB screenshot in base64, plus text and meta
@@ -315,9 +316,9 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                 return err(400, "name: a-z, 0-9 and -, up to 32 characters");
             }
             let Some((pane, status)) = named_agent(name) else { return err(404, "not running") };
-            let screen = herdr(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
+            let screen = instinct(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
             let mut v = outcome(&app.home.join("femme-work").join(name), app.heads.get(*name).map(String::as_str), &status, name);
-            v["pane_id"] = pane.into();
+            v["pane_id"] = tagged(&pane).into();
             v["status"] = status.into();
             v["screen"] = screen.into();
             v["report"] = fs::read_to_string(report_path(app, name)).ok().map(|r| r.trim().to_string()).filter(|r| !r.is_empty()).into();
@@ -423,7 +424,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             }
             let Some((pane, _)) = named_agent(name) else { return err(404, "not running") };
             let ws = pane.split(':').next().unwrap_or("").to_string();
-            herdr(&["workspace", "close", &ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
+            instinct(&["workspace", "close", &ws]).map(|_| ok(json!({"ok": true}))).unwrap_or_else(|e| err(502, &e))
         }
         (Method::Post, ["api", "logout"]) => {
             let token = session_cookie(req).unwrap_or_default();
@@ -498,7 +499,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                 None => return err(502, "herdr could not open a workspace"),
             };
             if let Some(kind) = input["agent"].as_str().filter(|k| ["claude", "codex", "pi"].contains(k)) {
-                wait_for_shell(&pane);
+                wait_for_shell(herdr, &pane);
                 let name = format!("t-{}", &random_hex()[..8]);
                 let _ = herdr(&["agent", "start", &name, "--kind", kind, "--pane", &pane, "--timeout", "60000"]);
                 let _ = herdr(&["agent", "rename", &pane, "--clear"]);
@@ -655,13 +656,13 @@ fn send(app: &mut App, name: &str, pane: String, text: String) -> Resp {
     if let Some(head) = git(&dir, &["rev-parse", "HEAD"]) {
         app.heads.insert(name.to_string(), head);
     }
-    match herdr(&["agent", "prompt", name, &text]) {
+    match instinct(&["agent", "prompt", name, &text]) {
         Ok(_) => {
             // herdr sees `working` a moment later; until then a GET would read the last task as finished.
             let _ = (0..10).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "working")));
-            ok(json!({"pane_id": pane, "status": "working"}))
+            ok(json!({"pane_id": tagged(&pane), "status": "working"}))
         }
-        Err(e) => ok(json!({"error": e, "pane_id": pane})).with_status_code(409),
+        Err(e) => ok(json!({"error": e, "pane_id": tagged(&pane)})).with_status_code(409),
     }
 }
 
@@ -791,7 +792,7 @@ fn clone_url(repo: &str, token: &str) -> String {
 
 /// The pane and status of the herdr agent called `name`, if it is running.
 fn named_agent(name: &str) -> Option<(String, String)> {
-    let v: Value = serde_json::from_str(&herdr(&["agent", "get", name]).ok()?).ok()?;
+    let v: Value = serde_json::from_str(&instinct(&["agent", "get", name]).ok()?).ok()?;
     let a = &v["result"]["agent"];
     Some((a["pane_id"].as_str()?.to_string(), text(a, "agent_status").to_string()))
 }
@@ -840,21 +841,21 @@ fn open_agent(app: &App, name: &str, input: &Value, caller: Option<&Value>) -> R
         }
         dir.display().to_string()
     };
-    let out = herdr(&["workspace", "create", "--cwd", &dir, "--label", name, "--no-focus"]).map_err(|e| err(502, &e))?;
+    let out = instinct(&["workspace", "create", "--cwd", &dir, "--label", name, "--no-focus"]).map_err(|e| err(502, &e))?;
     let pane = serde_json::from_str::<Value>(&out).ok().map(|v| text(&v["result"]["root_pane"], "pane_id").to_string()).unwrap_or_default();
     if pane.is_empty() {
         return Err(err(502, "herdr could not open a workspace"));
     }
-    wait_for_shell(&pane);
-    if let Err(e) = herdr(&["agent", "start", name, "--kind", "claude", "--pane", &pane, "--timeout", "60000"]) {
+    wait_for_shell(instinct, &pane);
+    if let Err(e) = instinct(&["agent", "start", name, "--kind", "claude", "--pane", &pane, "--timeout", "60000"]) {
         // Claude's "do you trust this folder?" on its first visit: the folder is the caller's own
         // clone (or choice), so yes; then Claude finishes starting and herdr picks it up by name.
-        let screen = herdr(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
+        let screen = instinct(&["pane", "read", &pane, "--source", "visible", "--format", "text"]).unwrap_or_default();
         let trusted = screen.contains("trust this folder")
-            && herdr(&["pane", "send-keys", &pane, "down", "enter"]).is_ok()
+            && instinct(&["pane", "send-keys", &pane, "down", "enter"]).is_ok()
             && (0..60).any(|_| settle(|| named_agent(name).is_some_and(|(_, s)| s == "idle")));
         if !trusted {
-            let _ = herdr(&["workspace", "close", pane.split(':').next().unwrap_or("")]);
+            let _ = instinct(&["workspace", "close", pane.split(':').next().unwrap_or("")]);
             return Err(err(502, &format!("Claude did not start: {e}")));
         }
     }
@@ -1107,9 +1108,9 @@ fn pane_status(sock: Option<&Path>, pane: &str) -> Option<String> {
     v["result"]["agent"]["agent_status"].as_str().map(String::from)
 }
 
-fn wait_for_shell(pane: &str) {
+fn wait_for_shell(h: fn(&[&str]) -> Result<String, String>, pane: &str) {
     for _ in 0..30 {
-        let ready = herdr(&["pane", "process-info", "--pane", pane])
+        let ready = h(&["pane", "process-info", "--pane", pane])
             .ok()
             .and_then(|o| serde_json::from_str::<Value>(&o).ok())
             .is_some_and(|v| v["result"]["process_info"]["foreground_processes"].as_array().is_some_and(|a| a.len() == 1));
@@ -1228,7 +1229,20 @@ fn clean_name(name: &str) -> String {
 }
 
 fn herdr(args: &[&str]) -> Result<String, String> {
-    herdr_on(None, args)
+    run(Command::new("herdr").args(args))
+}
+
+/// Instinct's terminals live in a herdr session of their own (systemd/herdr-instinct.service):
+/// on a laptop they are a machine tab of their own (`herdr machine add agentbox --label
+/// "Instinct · Onur" --remote-session instinct`), and on the Terminals tab they carry the
+/// `instinct~` tag, since bootstrap.sh lends that session's socket to remote/ like a laptop's.
+fn instinct(args: &[&str]) -> Result<String, String> {
+    run(Command::new("herdr").args(["--session", INSTINCT]).args(args))
+}
+
+/// A pane of Instinct's session as the Terminals routes know it.
+fn tagged(pane: &str) -> String {
+    format!("{INSTINCT}~{pane}")
 }
 
 /// herdr on a linked machine goes through its forwarded socket, under `timeout`: a link that
@@ -1238,7 +1252,11 @@ fn herdr_on(sock: Option<&Path>, args: &[&str]) -> Result<String, String> {
     if let Some(sock) = sock {
         cmd.args(["5", "herdr"]).env("HERDR_SOCKET_PATH", sock);
     }
-    let out = cmd.args(args).output().map_err(|e| format!("herdr: {e}"))?;
+    run(cmd.args(args))
+}
+
+fn run(cmd: &mut Command) -> Result<String, String> {
+    let out = cmd.output().map_err(|e| format!("herdr: {e}"))?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {

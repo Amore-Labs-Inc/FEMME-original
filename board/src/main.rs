@@ -1262,7 +1262,7 @@ fn herdr(args: &[&str]) -> Result<String, String> {
 
 /// Instinct's terminals live in a herdr session of their own (systemd/herdr-instinct.service):
 /// on a laptop they are a machine tab of their own (`herdr machine add agentbox --label
-/// "Instinct · Onur" --remote-session instinct`), and on the Terminals tab they carry the
+/// "Instinct" --remote-session instinct`), and on the Terminals tab they carry the
 /// `instinct~` tag, since bootstrap.sh lends that session's socket to remote/ like a laptop's.
 fn instinct(args: &[&str]) -> Result<String, String> {
     run(Command::new("herdr").args(["--session", INSTINCT]).args(args))

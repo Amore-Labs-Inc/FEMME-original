@@ -59,6 +59,8 @@ esac
 install -m755 pc.sh ~/.local/bin/pc
 # The same rule for every agent: Claude reads ~/.claude/rules, Codex its global ~/.codex/AGENTS.md.
 mkdir -p ~/.claude/rules && cp rules/pc.md ~/.claude/rules/femme-pc.md
+# Skills from this repo: Claude reads ~/.claude/skills/<name>/SKILL.md (a session started after this sees it).
+mkdir -p ~/.claude/skills && rm -rf ~/.claude/skills/write-in-turkish && cp -r skills/write-in-turkish ~/.claude/skills/
 { [ -f ~/.codex/AGENTS.md ] && sed '/^<!-- femme pc start -->$/,/^<!-- femme pc end -->$/d' ~/.codex/AGENTS.md
   printf '<!-- femme pc start -->\n'; cat rules/pc.md; printf '<!-- femme pc end -->\n'
 } > ~/.codex/AGENTS.new && mv ~/.codex/AGENTS.new ~/.codex/AGENTS.md

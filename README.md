@@ -170,6 +170,7 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `notify.sh` | VPS | Polls `herdr api snapshot`, pushes to ntfy on `blocked` and `done`. |
 | `fork-remote.sh` | laptop | The herdr plugin action: fork to the VPS. |
 | `files.sh`, `files-pane.sh` | VPS | The plugin's drop box: action and pane. Files dragged from the laptop land in the agent's folder. |
+| `hooks/subagent-model.sh` | VPS | Claude hook: subagents run on Opus or Sonnet, never Fable. A Fable request becomes Opus; a fork from a Fable session is refused with the fix in the reason. |
 | `skills/write-in-turkish/` | VPS | Claude skill: anything that must be written in Turkish is drafted in English and put into Turkish by the `codex` CLI (OpenAI model), then checked. |
 | `board/` | VPS | The issues board server (Rust). |
 | `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |

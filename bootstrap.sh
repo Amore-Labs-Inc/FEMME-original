@@ -17,7 +17,13 @@ command -v codegraph >/dev/null || curl -fsSL https://raw.githubusercontent.com/
 # Every Claude here runs as `claude --dangerously-skip-permissions` (same mode, no dialog): nobody is
 # at the keyboard to answer prompts. sync.sh copies the laptop's settings over this file first.
 mkdir -p ~/.claude; f=~/.claude/settings.json; [ -s $f ] || echo {} > $f
-jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true' $f > $f.tmp && mv $f.tmp $f
+# Subagents run on Opus or Sonnet, never Fable: this default covers agents that name no model, the hook
+# (hooks/subagent-model.sh) the rest. The hook entry is replaced, not duplicated, on every run.
+mkdir -p ~/.claude/hooks && install -m755 hooks/subagent-model.sh ~/.claude/hooks/femme-subagent-model.sh
+jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true
+  | .env.CLAUDE_CODE_SUBAGENT_MODEL = "opus"
+  | .hooks.PreToolUse = [(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command // "" | test("femme-subagent-model")) | not)]
+      + [{matcher: "Agent", hooks: [{type: "command", command: "bash ~/.claude/hooks/femme-subagent-model.sh"}]}]' $f > $f.tmp && mv $f.tmp $f
 
 # Same herdr version as the laptop: the laptop's client talks to this server.
 want=${HERDR_VERSION:?pass HERDR_VERSION}

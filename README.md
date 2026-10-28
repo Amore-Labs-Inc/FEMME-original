@@ -96,9 +96,9 @@ Trust: the VPS's key logs in to your laptop as you, so anything running as your 
 
 ### The box's own AWS access
 
-`provision.sh` gives the instance the IAM role `femme`: launch, stop and terminate instances of the `SPAWN_TYPES` types in `REGION` only (plus the security groups, key pairs and tags that takes), no IAM. The credentials come from the instance metadata service and rotate themselves, so there is nothing to leak; but anything running on the box can use them, so the policy is the guard.
+The instance has an IAM role (`provision.sh` makes `femme`; the current box carries `agentbox-s3`, made by hand) with AWS's `PowerUserAccess`: everything in the account except IAM, so agents can spin instances and services up and down but cannot make users, keys or roles. The credentials come from the instance metadata service and rotate themselves, so there is no key on disk to leak; but anything running on the box can use them, so IAM being off limits is the guard. No token to hand the box: a stored key would only be worse than the role.
 
-After rerunning `./provision.sh`, remove whatever is in `~/.aws` on the VPS (a static key or the board's `aws login` session shadows the role): `aws logout`, or delete the files. Then `aws sts get-caller-identity` shows `assumed-role/femme/i-…`, and so does the board's accounts window.
+The role is shadowed by anything in `~/.aws` (a static key, or the board's `aws login` session, which also runs every agent as that user). To get back to the role: `aws logout`, then delete the `login_session` line it leaves in `~/.aws/config`. Then `aws sts get-caller-identity` shows `assumed-role/<role>/i-…`, and so does the board's accounts window.
 
 Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard instances" (vCPUs) for the region to e.g. 16. Add a Budgets email alert too, but alerts lag hours and stop nothing. Credits apply to the bill automatically.
 

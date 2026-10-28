@@ -43,6 +43,8 @@ policy='{"Version":"2012-10-17","Statement":[
 aws iam get-role --role-name femme >/dev/null 2>&1 || aws iam create-role --role-name femme --assume-role-policy-document \
   '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
 aws iam put-role-policy --role-name femme --policy-name femme-spawn --policy-document "$policy"
+# Plus everything but IAM: agents on the box run the whole account (spin things up and down) with no key on disk.
+aws iam attach-role-policy --role-name femme --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
 roles=$(aws iam get-instance-profile --instance-profile-name femme --query 'InstanceProfile.Roles[].RoleName' 2>/dev/null) \
   || { aws iam create-instance-profile --instance-profile-name femme >/dev/null; roles=; }
 [ "$roles" = femme ] || aws iam add-role-to-instance-profile --instance-profile-name femme --role-name femme

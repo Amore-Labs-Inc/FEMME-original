@@ -6,8 +6,8 @@
 //! <state>/report.token, which opens that one route and nothing else.
 //! Another agent (Instinct) keeps one standing Claude here, by name, through /api/agents/{name}
 //! with a key made on the board (<state>/api-keys.json); GET /api/openapi.json describes that for it.
-//! Claude accounts on the box are cswap's: the board lists, switches and adds them. It also signs
-//! the box's AWS CLI in.
+//! Claude accounts on the box are cswap's: the board lists, switches and adds them, and shows who
+//! the box's AWS CLI runs as.
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde_json::{json, Value};
@@ -69,14 +69,13 @@ struct App {
     resend_key: String,
     from: String,
     accounts: Arc<Mutex<Value>>,   // account_status(), refreshed in the background
-    logins: HashMap<String, Login>, // sign-ins waiting for their code: "claude" or "aws"
+    logins: HashMap<String, Login>, // sign-ins waiting for their code: "claude"
 }
 
 /// A sign-in that needs a browser: the command prints a link, you sign in wherever you are, and
 /// the code the page then shows goes back to it on stdin.
 /// - claude: a new cswap account. It signs in under its own config dir, so the box's live login
 ///   (and every agent on it) stays untouched; `cswap add` then stores it from there.
-/// - aws: the box's own AWS CLI (`aws login --remote`).
 /// - gh: a GitHub account for an API key. The other way round: gh shows a one-time code, the
 ///   account's owner enters it at github.com/login/device, and gh ends when they have. It runs
 ///   in its own config dir, so the box's gh login (and the worker's pushes) stay as they are.
@@ -96,7 +95,7 @@ impl Login {
             // BROWSER: nothing to open here, the link goes to the board.
             "claude" => cmd.args(["auth", "login"]).env("CLAUDE_CONFIG_DIR", &dir).env("BROWSER", "true"),
             "gh" => cmd.args(["auth", "login", "--hostname", "github.com", "--git-protocol", "https", "--web", "--skip-ssh-key"]).env("GH_CONFIG_DIR", dir.join("gh")),
-            _ => cmd.args(["login", "--remote"]),
+            other => return Err(format!("no sign-in for {other}")),
         };
         let child = cmd
             .stdin(Stdio::piped())
@@ -579,7 +578,7 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
             app.accounts.lock().unwrap()["cswap"] = cswap_list();
             ok(accounts(app))
         }
-        (Method::Post, ["api", "accounts", kind @ ("claude" | "aws"), "login"]) => {
+        (Method::Post, ["api", "accounts", kind @ "claude", "login"]) => {
             app.logins.remove(*kind); // ends an earlier attempt first
             match Login::start(kind, app.meta.with_file_name(format!("{kind}-login"))) {
                 Ok(login) => {
@@ -589,14 +588,14 @@ fn route(req: &mut Request, app: &mut App) -> Resp {
                 Err(e) => err(502, &e),
             }
         }
-        (Method::Post, ["api", "accounts", kind @ ("claude" | "aws"), "code"]) => {
+        (Method::Post, ["api", "accounts", kind @ "claude", "code"]) => {
             let Ok(input) = read_json(req) else { return err(400, "invalid JSON") };
             let Some(code) = sign_in_code(input["code"].as_str().unwrap_or("")) else {
                 return err(400, "paste the code exactly as the sign-in page shows it");
             };
             let Some(mut login) = app.logins.remove(*kind) else { return err(409, "that sign-in ended; start again") };
             let mut done = login.finish(&code);
-            if *kind == "claude" && done.is_ok() {
+            if done.is_ok() {
                 done = cswap(&["add"], Some(&login.dir)).map(drop);
             }
             drop(login);
@@ -1315,7 +1314,7 @@ fn cswap_list() -> Value {
         .unwrap_or_else(|e| json!({"error": e}))
 }
 
-/// The accounts window: cswap's list, and who the AWS CLI is signed in as.
+/// The accounts window: cswap's list, and who the AWS CLI runs as (the instance role).
 fn account_status() -> Value {
     let aws = Command::new("aws")
         .args(["sts", "get-caller-identity", "--output", "json", "--cli-connect-timeout", "5", "--cli-read-timeout", "5"])
@@ -1324,7 +1323,7 @@ fn account_status() -> Value {
         .output();
     let aws = match aws {
         Ok(o) if o.status.success() => serde_json::from_slice(&o.stdout).unwrap_or_default(),
-        Ok(o) => json!({"error": last_line(&String::from_utf8_lossy(&o.stderr)).unwrap_or("not signed in")}),
+        Ok(o) => json!({"error": last_line(&String::from_utf8_lossy(&o.stderr)).unwrap_or("no AWS access")}),
         Err(e) => json!({"error": format!("aws: {e}")}),
     };
     json!({"cswap": cswap_list(), "aws": aws})
@@ -1342,8 +1341,8 @@ fn login_url(out: &str) -> Option<String> {
     url.contains("/authorize?").then_some(url)
 }
 
-/// The code a sign-in page shows: Claude's is short, AWS's is a few KB of base64. Copying a long
-/// one can pick up line breaks, so whitespace goes; it is written to stdin, so no control bytes.
+/// The code a sign-in page shows. Copying it can pick up line breaks, so whitespace goes; it is
+/// written to stdin, so no control bytes.
 fn sign_in_code(s: &str) -> Option<String> {
     let code: String = s.chars().filter(|c| !c.is_whitespace()).collect();
     (!code.is_empty() && code.len() <= 16_000 && !code.chars().any(char::is_control)).then_some(code)

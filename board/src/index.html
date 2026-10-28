@@ -38,7 +38,7 @@
   .dialog .tb { color: var(--paper); }
   #accts { display: grid; gap: 3px; }
   .acct { display: grid; gap: 6px; height: auto; padding: 8px 12px; text-align: left; font: 16px/1.4 "Schibsted Grotesk", system-ui, sans-serif; letter-spacing: .02em; }
-  .acct.on { box-shadow: inset 6px 0 0 var(--work); padding-left: 16px; }
+  .acct.on, .aws.on { box-shadow: inset 6px 0 0 var(--work); padding-left: 16px; }  /* the account in use, and AWS while signed in */
   .acct .title { margin: 0; }
   .mini { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); }
   .mini .meter { height: 10px; margin: 0; }
@@ -125,7 +125,7 @@
     <h2 class="tb">accounts<button id="acct-add">+ add</button></h2>
     <div class="frame">
       <div id="accts"><div class="empty">loading accounts</div></div>
-      <div class="card aws"><span class="title">AWS</span><span class="meta" id="aws-who">checking</span><button id="aws-login">sign in</button></div>
+      <div class="card aws" id="aws"><span class="title">AWS</span><span class="meta" id="aws-who">checking</span><button id="aws-login">sign in</button></div>
       <div class="card">
         <div class="row"><span class="title">API keys</span><span class="meta">another agent's standing Claude · /api/openapi.json</span></div>
         <div id="keys" class="meta"></div>
@@ -273,6 +273,7 @@
       : c.accounts?.length ? c.accounts.map(acct).join('') : '<div class="empty">no accounts yet: + add</div>';
     $('aws-who').textContent = !a ? 'checking' : a.Arn ? `${a.Account} · ${a.Arn.split(':').pop()}` : 'not signed in';
     $('aws-who').title = a?.Arn || a?.error || '';
+    $('aws').classList.toggle('on', !!a?.Arn);
     if (!login[loginKind]) loginKind = Object.keys(login)[0] || null;
     $('login').classList.toggle('hidden', !loginKind);
     if (!loginKind) return;

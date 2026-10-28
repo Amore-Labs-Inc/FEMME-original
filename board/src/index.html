@@ -38,7 +38,7 @@
   .dialog .tb { color: var(--paper); }
   #accts { display: grid; gap: 3px; }
   .acct { display: grid; gap: 6px; height: auto; padding: 8px 12px; text-align: left; font: 16px/1.4 "Schibsted Grotesk", system-ui, sans-serif; letter-spacing: .02em; }
-  .acct.on, .aws.on { box-shadow: inset 6px 0 0 var(--work); padding-left: 16px; }  /* the account in use, and AWS while signed in */
+  .acct.on, .aws.on { box-shadow: inset 6px 0 0 var(--work); padding-left: 16px; }  /* the account in use; AWS when the CLI has an identity */
   .acct .title { margin: 0; }
   .mini { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); }
   .mini .meter { height: 10px; margin: 0; }
@@ -125,7 +125,7 @@
     <h2 class="tb">accounts<button id="acct-add">+ add</button></h2>
     <div class="frame">
       <div id="accts"><div class="empty">loading accounts</div></div>
-      <div class="card aws" id="aws"><span class="title">AWS</span><span class="meta" id="aws-who">checking</span><button id="aws-login">sign in</button></div>
+      <div class="card aws" id="aws"><span class="title">AWS</span><span class="meta" id="aws-who">checking</span></div>
       <div class="card">
         <div class="row"><span class="title">API keys</span><span class="meta">another agent's standing Claude · /api/openapi.json</span></div>
         <div id="keys" class="meta"></div>
@@ -264,14 +264,14 @@
       ${a.usage ? `<span class="mini">${win('5h', a.usage.fiveHour)}${win('7d', a.usage.sevenDay)}</span>` : `<span class="meta">${esc(a.usageError || 'usage unknown')}</span>`}
     </button>`;
   // A sign-in in progress shows its link and a box for the code the sign-in page gives you.
-  const SIGNIN = { claude: ['Sign in with the new account', 'claude.ai', 'Add account'], aws: ['Sign in to AWS', 'AWS', 'Sign in'] };
+  const SIGNIN = { claude: ['Sign in with the new account', 'claude.ai', 'Add account'] };
   let loginKind = null;
   function showAccounts(d) {
     const c = d.cswap, a = d.aws, login = d.login || {};
     $('accts').innerHTML = !c ? '<div class="empty">loading accounts</div>'
       : c.error ? `<div class="empty err">${esc(c.error)}</div>`
       : c.accounts?.length ? c.accounts.map(acct).join('') : '<div class="empty">no accounts yet: + add</div>';
-    $('aws-who').textContent = !a ? 'checking' : a.Arn ? `${a.Account} · ${a.Arn.split(':').pop()}` : 'not signed in';
+    $('aws-who').textContent = !a ? 'checking' : a.Arn ? `${a.Account} · ${a.Arn.split(':').pop()}` : 'no AWS access';
     $('aws-who').title = a?.Arn || a?.error || '';
     $('aws').classList.toggle('on', !!a?.Arn);
     if (!login[loginKind]) loginKind = Object.keys(login)[0] || null;
@@ -307,7 +307,6 @@
     if (d) $('code').focus();
   }
   $('acct-add').onclick = () => signIn('claude', $('acct-add'));
-  $('aws-login').onclick = () => signIn('aws', $('aws-login'));
   $('login').onsubmit = async e => {
     e.preventDefault();
     const d = await accountCall(`/api/accounts/${loginKind}/code`, { method: 'POST', body: JSON.stringify({ code: $('code').value.trim() }) }, e.submitter);

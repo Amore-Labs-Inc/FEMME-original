@@ -114,7 +114,7 @@ EOF
   ln -sf ~/.local/share/cswap/bin/cswap ~/.local/bin/cswap
   # The box's own login becomes account 1 (fails harmlessly before the first /login).
   cswap list --json | jq -e '.accounts | length > 0' >/dev/null || cswap add || echo "WARN: cswap add failed; log in with claude, then rerun" >&2
-  # AWS CLI v2 for the board's AWS sign-in (`aws login --remote`). User-local, no sudo.
+  # AWS CLI v2 for the agents (the instance role signs it in) and the board's accounts window. User-local, no sudo.
   aws --version >/dev/null 2>&1 || { t=$(mktemp -d) && curl -fsSL -o "$t/aws.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" \
     && unzip -q "$t/aws.zip" -d "$t" && "$t/aws/install" -i ~/.local/share/aws-cli -b ~/.local/bin --update >/dev/null && rm -rf "$t"; }
   units="$units femme-board femme-worker femme-cswap femme-fable-cap"

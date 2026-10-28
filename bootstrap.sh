@@ -117,7 +117,7 @@ EOF
   # AWS CLI v2 for the board's AWS sign-in (`aws login --remote`). User-local, no sudo.
   aws --version >/dev/null 2>&1 || { t=$(mktemp -d) && curl -fsSL -o "$t/aws.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" \
     && unzip -q "$t/aws.zip" -d "$t" && "$t/aws/install" -i ~/.local/share/aws-cli -b ~/.local/bin --update >/dev/null && rm -rf "$t"; }
-  units="$units femme-board femme-worker femme-cswap"
+  units="$units femme-board femme-worker femme-cswap femme-fable-cap"
 fi
 
 mkdir -p ~/.config/systemd/user
@@ -132,6 +132,6 @@ if [ "$(herdr plugin list --json 2>/dev/null | jq -r '.result.plugins[] | select
   herdr plugin unlink femme >/dev/null 2>&1 || true
   herdr plugin link "$PWD" >/dev/null || echo "WARN: could not link the femme plugin from $PWD" >&2
 fi
-systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker femme-cswap}
+systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker femme-cswap femme-fable-cap}
 herdr server reload-config >/dev/null 2>&1 || true
 systemctl --user is-active $units

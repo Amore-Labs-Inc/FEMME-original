@@ -1,0 +1,12 @@
+[Unit]
+Description=FEMME auto-rotate on the Fable weekly limit: hold accounts past FABLE_CAP out of rotation and move off them
+After=femme-cswap.service
+
+[Service]
+Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/femme/fable-cap.sh
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=default.target

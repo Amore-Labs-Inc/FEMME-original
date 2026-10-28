@@ -150,7 +150,7 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 
 - **+ add**: open the sign-in link, log in on claude.ai with the new account, paste the code it shows into the board. The board signs in a separate config dir, runs `cswap add` from there, and leaves the VPS's live login alone. Never run `/logout`: it drops the stored accounts.
 - Click an account to switch the VPS to it (`cswap switch`).
-- `femme-cswap.service` runs `cswap auto --threshold $CAP`: when the active account passes `CAP` it switches to the account with the most left, so agents only pause once every account is past `CAP` (keep it 50-99).
+- `femme-cswap.service` runs `cswap auto --threshold $CAP`: when the active account passes `CAP` it switches to the account with the most left, so agents only pause once every account is past `CAP` (keep it 50-99). `femme-fable-cap.service` does the same for the Fable weekly limit at `FABLE_CAP` (96%): an account past it is held out of rotation (`cswap disable`) until its week resets, and the box moves to the account with the most left.
 - `bootstrap.sh` installs cswap and saves the VPS's current login as account 1.
 - **AWS**: the window also shows who the VPS's AWS CLI is signed in as. **sign in** opens the AWS sign-in page; paste the code it shows into the board, which finishes `aws login --remote` for you. `bootstrap.sh` installs the AWS CLI.
 
@@ -175,6 +175,7 @@ The board's **accounts** window lists every Claude account stored with [cswap](h
 | `board/` | VPS | The issues board server (Rust). |
 | `worker.sh` | VPS | Runs board issues as herdr Claude agents within the budget. |
 | `systemd/femme-cswap.service` | VPS | Auto-rotates Claude accounts at `CAP`. |
+| `fable-cap.sh`, `systemd/femme-fable-cap.service` | VPS | Auto-rotates Claude accounts at `FABLE_CAP` of the Fable weekly limit. |
 | `systemd/herdr-instinct.service` | VPS | The herdr session Instinct's terminals run in. |
 | `systemd/mutagen.service` | laptop | Keeps sync sessions running across reboots. |
 | `systemd/femme-link.service` | laptop | Puts the laptop's herdr terminals on the board and its sshd within reach of `pc`. |

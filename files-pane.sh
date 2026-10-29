@@ -18,9 +18,11 @@ spin=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏); tick=0
 trap 'exit' HUP TERM
 if [ -t 0 ]; then
   saved=$(stty -g)
-  trap 'stty "$saved"; printf "\033[?25h"; rm -rf "$st"' EXIT
+  trap 'stty "$saved"; printf "\033[?7h\033[?25h\033[?1049l"; rm -rf "$st"' EXIT
   stty -echo -icanon min 1           # a drop has no newline: take bytes as they come, and quietly
-  printf '\033[?25l\033]0;Files · drop box\007'
+  # Alternate screen: nothing the box draws reaches the scrollback. No auto-wrap: a line wider than
+  # the pane is clipped, never scrolls.
+  printf '\033[?1049h\033[?25l\033[?7l\033]0;Files · drop box\007'
 else
   trap 'rm -rf "$st"' EXIT
 fi
@@ -33,8 +35,10 @@ render() {
   local rows cols n f state rest now dim=
   read -r rows cols < <(stty size 2>/dev/null || echo 24 80)
   n=$((rows - 4)); [ "$n" -gt 0 ] || n=1
-  focused && foot=$'\033[1;32m● drop a file from the laptop here\033[0m\033[2m · q closes\033[0m' \
-          || { dim=$'\033[2m'; foot=$'\033[30;43m click here first \033[0m\033[33m a drop lands in the focused pane\033[0m'; }
+  if focused; then f1='● drop a file from the laptop here'; f2=' · q closes'; c1=$'\033[1;32m'; c2=$'\033[2m'
+  else dim=$'\033[2m'; f1=' click here first '; f2=' a drop lands in the focused pane'; c1=$'\033[30;43m'; c2=$'\033[33m'; fi
+  foot=$f1$f2; foot=${foot:0:cols-1}   # a footer wider than the pane wraps and scrolls: one header line into scrollback per redraw
+  foot=$c1${foot:0:${#f1}}$'\033[0m'$c2${foot:${#f1}}$'\033[0m'
   printf '\033[H\033[2J\033[1m%s\033[0m\n%s' "${dir/#$HOME/\~}" "$dim"
   # Newest first, so what just landed is the top line.
   find . -mindepth 1 -maxdepth 1 -printf '%T@\t%TH:%TM\t%s\t%y\t%P\n' | sort -rn | head -n "$n" \

@@ -39,7 +39,7 @@ image() {  # <region> <role>: our image with that role, "None" if none
   at "$1" ec2 describe-images --owners self --filters "Name=tag:femme:role,Values=$2" Name=state,Values=pending,available \
     --query 'Images[0].ImageId'
 }
-wait_image() {  # <region> <image>: until available; no time limit, a 235 GB first copy takes an hour
+wait_image() {  # <region> <image>: until available; no time limit, a first snapshot of 235 GB takes hours
   local s t=0
   while s=$(at "$1" ec2 describe-images --image-ids "$2" --query 'Images[0].State'); [ "$s" != available ]; do
     [ "$s" = pending ] || die "image $2 in $1 is $s"

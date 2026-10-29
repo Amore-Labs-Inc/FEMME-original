@@ -108,12 +108,23 @@ Latency is distance: every keystroke to a VPS pane makes one round trip, so a re
 
 From the laptop checkout, logged in (`aws login`), `TO=eu-central-1` by default:
 
-1. `./migrate-region.sh prewarm`: no downtime. A first image and its copy (the slow part, about an hour for 235 GB; the cutover copy is then incremental), the security group and the Elastic IP in the new region.
+1. `./migrate-region.sh prewarm`: no downtime. A first image and its copy (the slow part: the first snapshot of 235 GB takes hours, the cutover one is then incremental), the security group and the Elastic IP in the new region.
 2. `./migrate-region.sh cutover`, at a quiet moment: stops the box (agents, board and API are down from here, tell whoever uses the API), images it, copies, launches, checks the new box over ssh by IP (same host key, hostname, every service, the board, the role, the accounts, swap) and then asks you to point the A record at the new IP in Cloudflare. About 20 minutes.
 3. `./migrate-region.sh laptop`: `~/.ssh/config`, `known_hosts`, `.env` and the security groups of your other servers that allowlist the box's IP. Then set the new IP in Moshi.
 4. A week later, `./migrate-region.sh cleanup`: terminates the old box, releases its IP, deletes the old images; the new region's cutover image stays a while as a backup. `./migrate-region.sh rollback` before that puts everything back on the old box.
 
 Every step finds what it already made by tag and skips it, so a rerun continues where it stopped. The new disk fills from the snapshot lazily: the first hour on the new box reads slower. What a move does not carry: the S3 bucket (stays, works cross-region), docker containers and quick tunnels started by hand (as after any reboot), and the Elastic IP (regions keep theirs).
+
+### When a turn takes forever
+
+The wire is not it: from the box, api.anthropic.com answers in 5 ms with no loss, and no session here has ever retried a request. A long silence is, in order of likelihood: the model thinking (`effortLevel: xhigh` thinks for minutes with nothing on screen), an auto-compaction (about 2 minutes, at 310k tokens), a prompt queued behind a running turn (Esc stops the turn first), or a usage cap (the accounts window shows it). Every session writes `~/.claude/debug/<session>.txt` (`bootstrap.sh` sets `DEBUG_SDK=1`), so the next long wait has a timestamped record. What the last hour's requests waited for, by session and time:
+
+```sh
+find ~/.claude/debug -name '*.txt' -mmin -60 -exec awk '/API REQUEST|first byte|engine\] turn .* end|autocompact|api_error|[Rr]etry|watchdog/ {
+  print substr(FILENAME, length(FILENAME) - 11, 8), substr($0, 12, 8), substr($0, index($0, "] ") + 2, 110) }' {} + | sort -k2
+```
+
+A stream with no bytes for 60 s (`CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS`) is retried once, instead of after the default 180 s; the API pings every few seconds while the model thinks, so a minute of silence is a real stall.
 
 ## Issues board
 

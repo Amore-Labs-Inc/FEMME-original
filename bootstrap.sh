@@ -19,9 +19,13 @@ command -v codegraph >/dev/null || curl -fsSL https://raw.githubusercontent.com/
 mkdir -p ~/.claude; f=~/.claude/settings.json; [ -s $f ] || echo {} > $f
 # Subagents run on Opus or Sonnet, never Fable: this default covers agents that name no model, the hook
 # (hooks/subagent-model.sh) the rest. The hook entry is replaced, not duplicated, on every run.
+# Every session writes ~/.claude/debug/<session>.txt, so a turn that "hangs" has a timestamped record
+# (DEBUG_SDK is Claude's own switch; DEBUG=1 would leak into make and Django). A stream silent for
+# 60 s is retried, instead of the default 180 s.
 mkdir -p ~/.claude/hooks && install -m755 hooks/subagent-model.sh ~/.claude/hooks/femme-subagent-model.sh
 jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true
   | .env.CLAUDE_CODE_SUBAGENT_MODEL = "opus"
+  | .env.DEBUG_SDK = "1" | .env.CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS = "60000"
   | .hooks.PreToolUse = [(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command // "" | test("femme-subagent-model")) | not)]
       + [{matcher: "Agent", hooks: [{type: "command", command: "bash ~/.claude/hooks/femme-subagent-model.sh"}]}]' $f > $f.tmp && mv $f.tmp $f
 

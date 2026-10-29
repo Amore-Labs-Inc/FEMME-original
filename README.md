@@ -107,10 +107,10 @@ Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard ins
 Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point an A record (DNS only) for `BOARD_URL`'s host at the VPS, rerun `./provision.sh` (opens 80/443) and `./sync.sh`.
 
 - Sign in with a magic link sent to your address, one of those in `BOARD_EMAIL` (comma-separated; everyone on it gets the same full access). The link works once, for 15 minutes (one link a minute per client); the cookie lasts 7 days.
-- Add an issue: pick a repo, describe the work. The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
+- Add an issue: on the **Issues** tab, pick the repo on the composer's chip and describe the work (the first line is the title, the rest the details; attached files are listed by their path on the box). The worker clones it to `~/femme-work`, creates branch `femme/issue-N`, and runs Claude in a herdr workspace named `#N ...`, so you can watch or step in from the phone.
 - Finished work arrives as a PR with `FEMME issue #N` in its body. The card moves to **PR ready**; after merging, press **Merged, done** and the workspace closes.
-- **Chat** on a card opens that agent's terminal: a real terminal (xterm.js) showing the pane's live screen in colour. Type straight into it (keys, arrows, Ctrl-C, paste); on a phone the key bar has Esc, Tab, arrows, Ctrl-C and Enter. Paste or drop an image or file (or use the upload button): it is saved to `~/.local/state/femme/uploads` (kept 7 days) and its path is typed in, which Claude Code attaches as an image. **End** closes the workspace.
-- **Terminals** tab: every VPS workspace. Open a new one (shell, Claude, Codex or Pi) in any folder under `$HOME` (Claude's trust question on a folder's first visit is answered yes: the folder was yours to pick), use it the same way, or close it.
+- **Chat** on a card opens that agent's terminal: a real terminal (xterm.js) showing the pane's live screen in colour, with a composer under it as in the Claude app. Write the message (the mic dictates it where the browser has one), **+** adds a photo from the camera or the library or any file, the arrow hands it to the agent as one prompt (a shell gets a command line). You can also type straight into the terminal (keys, arrows, Ctrl-C, paste; on a phone the key bar has Esc, Tab, arrows, Ctrl-C and Enter). Files go to `~/.local/state/femme/uploads` (kept 7 days) and their paths go in front of the message, which Claude Code attaches as images. **End** closes the workspace.
+- **Sessions** tab: every VPS workspace. The composer at the bottom opens a new one: pick the folder (any under `$HOME`) and the agent (Claude, Codex, Pi or a shell) on its chips, describe the task, send; the session opens with the task as its first message (Claude's trust question on a folder's first visit is answered yes: the folder was yours to pick). **+** names the session or attaches photos and files. Open one from the list to use it the same way, or close it.
 - Linked laptops' workspaces are listed there too, tagged with the laptop's hostname, while it is awake. `femme-link.service` forwards the laptop's herdr socket to `~/.config/herdr/remote/<hostname>.sock` on the VPS over SSH. New terminals open on the VPS only, and uploads only reach VPS terminals. Anything running as your user on the VPS, agents included, can then type into the laptop's terminals.
 - Merging to `main` deploys itself: every 20 seconds `femme-deploy.timer` checks GitHub, and when `main` moved it checks it out in `~/femme` and reruns `bootstrap.sh` (rebuilds the board, restarts board and worker). The board shows `deploying`, then `deployed <commit>` or why it failed, until you close it; a failed build leaves the old board running. `./sync.sh` still pushes your unmerged laptop copy.
 - Budget: at most `PARALLEL` (2) issues at once. When the 5-hour window passes `CAP` (60%), running agents are interrupted and continue after the reset, so the rest of the window is yours. Set both in `.env`.
@@ -134,7 +134,7 @@ Content-Type: application/json
 
 ### API for other agents
 
-Another agent (Instinct) gets one standing Claude Code session on the box, reused for all its tasks, so the board is not filled with one terminal per task. Make it a key in the accounts window (**API keys**, name it, copy the key: it is shown once) and hand over the key with `$BOARD_URL/api/openapi.json`, an OpenAPI 3 document written for a program to read: auth, each route with an example, errors, what is safe to retry. **revoke** next to a key ends it at once; keys live in `~/.local/state/femme/api-keys.json`.
+Another agent (Instinct) gets one standing Claude Code session on the box, reused for all its tasks, so the board is not filled with one terminal per task. Make it a key on the accounts page (**API keys**, name it, copy the key: it is shown once) and hand over the key with `$BOARD_URL/api/openapi.json`, an OpenAPI 3 document written for a program to read: auth, each route with an example, errors, what is safe to retry. **revoke** next to a key ends it at once; keys live in `~/.local/state/femme/api-keys.json`.
 
 To push as the other person rather than as the box's GitHub login, put their GitHub account on the key: **connect GitHub** next to it shows a one-time code; they enter it at github.com/login/device signed in as themselves (the usual `gh auth login`, in a config dir of its own, so the box's login is untouched), and the key gets their token, name and GitHub noreply address. Or paste a token when making the key (a fine-grained PAT for the repo, Contents: read and write; the name and address come from GitHub). The repos that key's sessions clone are fetched and pushed with the token (it sits in that clone's `.git/config`, so the session's Claude can read it: it works on their behalf anyway) and commits carry the name. Set again on every open, so connecting again takes over; a key without an account hands the clone back to the box's `gh`.
 
@@ -146,13 +146,13 @@ To push as the other person rather than as the box's GitHub login, put their Git
 
 ### Accounts
 
-The board's **accounts** window lists every Claude account stored with [cswap](https://pypi.org/project/claude-swap/), with each account's 5-hour and 7-day usage.
+The board's **accounts** page (the ⋯ button) lists every Claude account stored with [cswap](https://pypi.org/project/claude-swap/), with each account's 5-hour and 7-day usage.
 
 - **+ add**: open the sign-in link, log in on claude.ai with the new account, paste the code it shows into the board. The board signs in a separate config dir, runs `cswap add` from there, and leaves the VPS's live login alone. Never run `/logout`: it drops the stored accounts.
 - Click an account to switch the VPS to it (`cswap switch`).
 - `femme-cswap.service` runs `cswap auto --threshold $CAP`: when the active account passes `CAP` it switches to the account with the most left, so agents only pause once every account is past `CAP` (keep it 50-99). `femme-fable-cap.service` does the same for the Fable weekly limit at `FABLE_CAP` (96%): an account past it is held out of rotation (`cswap disable`) until its week resets, and the box moves to the account with the most left.
 - `bootstrap.sh` installs cswap and saves the VPS's current login as account 1.
-- **AWS**: the window also shows who the VPS's AWS CLI runs as: the instance role (see *The box's own AWS access*). `bootstrap.sh` installs the AWS CLI.
+- **AWS**: the page also shows who the VPS's AWS CLI runs as: the instance role (see *The box's own AWS access*). `bootstrap.sh` installs the AWS CLI.
 
 ## Files
 

@@ -314,8 +314,9 @@
   // Accounts: cswap's Claude logins on the box. Click one to switch to it; + add signs in a new one.
   const win = (label, w) => typeof w?.pct === 'number'
     ? `<span>${label}</span><span class="meter"><i style="width:${Math.min(100, w.pct)}%"></i></span><span>${Math.round(w.pct)}%${w.countdown ? ' · ' + esc(w.countdown) : ''}</span>` : '';
+  const when = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }); };
   const acct = a => `<button class="card acct${a.active ? ' on' : ''}" data-n="${a.number}"${a.active ? ' aria-current="true"' : ''}>
-      <span class="row"><span class="title">${a.number} · ${esc(a.alias || a.email)}</span>${a.active ? '<span class="st">active</span>' : ''}${a.disabled ? '<span class="st">disabled</span>' : ''}</span>
+      <span class="row"><span class="title">${a.number} · ${esc(a.alias || a.email)}</span>${a.active ? '<span class="st">active</span>' : ''}${a.disabled ? '<span class="st">disabled</span>' : ''}${(a.usage?.scoped || []).map(s => `<span class="st">${esc(s.name.toLowerCase())} ${Math.round(s.pct)}% · ${when(s.resetsAt)}</span>`).join('')}</span>
       ${a.usage ? `<span class="mini">${win('5h', a.usage.fiveHour)}${win('7d', a.usage.sevenDay)}</span>` : `<span class="meta">${esc(a.usageError || 'usage unknown')}</span>`}
     </button>`;
   // A sign-in in progress shows its link and a box for the code the sign-in page gives you.

@@ -102,6 +102,19 @@ The role is shadowed by anything in `~/.aws` (a static key, or an `aws login` se
 
 Set a hard spend brake: in Service Quotas, lower "Running On-Demand Standard instances" (vCPUs) for the region to e.g. 16. Add a Budgets email alert too, but alerts lag hours and stop nothing. Credits apply to the bill automatically.
 
+### Moving the box to another region
+
+Latency is distance: every keystroke to a VPS pane makes one round trip, so a region closer to you is the only real speed-up (London is ~58 ms from Istanbul, Frankfurt ~42; Milan and Zurich are opt-in regions, and Milan lacks the instance type). `migrate-region.sh` moves the box by copying its disk rather than rebuilding: an image of the root volume, copied to the new region, launched there with the same instance profile; user, paths, herdr state, Claude sessions, accounts, board state and the Caddy certificate all travel as they are. The laptop keeps reaching the box through the `agentbox` alias, so one `HostName` change carries Mutagen, `femme-link`, the herdr machines and `pc`.
+
+From the laptop checkout, logged in (`aws login`), `TO=eu-central-1` by default:
+
+1. `./migrate-region.sh prewarm`: no downtime. A first image and its copy (the slow part, about an hour for 235 GB; the cutover copy is then incremental), the security group and the Elastic IP in the new region.
+2. `./migrate-region.sh cutover`, at a quiet moment: stops the box (agents, board and API are down from here, tell whoever uses the API), images it, copies, launches, checks the new box over ssh by IP (same host key, hostname, every service, the board, the role, the accounts, swap) and then asks you to point the A record at the new IP in Cloudflare. About 20 minutes.
+3. `./migrate-region.sh laptop`: `~/.ssh/config`, `known_hosts`, `.env` and the security groups of your other servers that allowlist the box's IP. Then set the new IP in Moshi.
+4. A week later, `./migrate-region.sh cleanup`: terminates the old box, releases its IP, deletes the old images; the new region's cutover image stays a while as a backup. `./migrate-region.sh rollback` before that puts everything back on the old box.
+
+Every step finds what it already made by tag and skips it, so a rerun continues where it stopped. The new disk fills from the snapshot lazily: the first hour on the new box reads slower. What a move does not carry: the S3 bucket (stays, works cross-region), docker containers and quick tunnels started by hand (as after any reboot), and the Elastic IP (regions keep theirs).
+
 ## Issues board
 
 Set `BOARD_EMAIL`, `BOARD_URL`, `RESEND_API_KEY`, `MAIL_FROM` in `.env`, point an A record (DNS only) for `BOARD_URL`'s host at the VPS, rerun `./provision.sh` (opens 80/443) and `./sync.sh`.
@@ -159,6 +172,7 @@ The board's **accounts** page (the ⋯ button) lists every Claude account stored
 | File | Runs on | Does |
 |---|---|---|
 | `provision.sh` | laptop | Creates the instance. Safe to rerun; reuses everything tagged `femme`. |
+| `migrate-region.sh` | laptop | Moves the box to another region by copying its disk; see above. |
 | `cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, mosh, 8 GB swap, linger. |
 | `sync.sh` | laptop | Copies config: `~/.claude` minus credentials and history, herdr, mise. Merges onboarding, trust and portable MCP servers into the VPS `~/.claude.json`. |
 | `sync-dir.sh` | laptop | Puts one folder in live two-way sync with the VPS, minus its `.femme-ignore`. |

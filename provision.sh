@@ -5,7 +5,8 @@ cd "$(dirname "$0")"
 [ -f .env ] || cp .env.example .env
 . ./.env
 aws() { command aws --region "$REGION" --output text "$@"; }
-setenv() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else echo "$1=$2" >> .env; fi; }
+# Portable (GNU and BSD/macOS): rewrite .env with KEY=value replaced or appended.
+setenv() { awk -v k="$1" -v v="$2" 'BEGIN{FS=OFS="="} $1==k{print k "=" v; f=1; next} {print} END{if(!f) print k "=" v}' .env > .env.tmp && mv .env.tmp .env; }
 tag() { echo "ResourceType=$1,Tags=[{Key=Name,Value=femme}]"; }
 retry() {  # rerun while EC2 has not yet heard of the new instance profile (takes a few seconds)
   for _ in 1 2 3 4 5 6; do
@@ -28,13 +29,16 @@ if [ "$sg" = None ]; then
     'IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=0.0.0.0/0}]' \
     'IpProtocol=udp,FromPort=60000,ToPort=61000,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null
 fi
-if [ -n "${BOARD_URL:-}" ]; then  # board: Caddy needs 80 for the certificate challenge, 443 to serve
+if [ "${BOARD_PUBLIC:-0}" = 1 ]; then  # public board (opt-in): Caddy needs 80 for the certificate challenge, 443 to serve
   aws ec2 authorize-security-group-ingress --group-id "$sg" --ip-permissions \
     'IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges=[{CidrIp=0.0.0.0/0}]' \
     'IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null 2>&1 || true  # already open
 fi
 
-# Instance role: agents on the box may launch small instances in this region and nothing else. Policy rewritten every run.
+# Optional instance role (AWS_ROLE=spawn): agents on the box may launch small instances in this region
+# and nothing else. Off by default: the box gets no AWS access. Policy rewritten every run.
+profile=()
+if [ "${AWS_ROLE:-none}" = spawn ]; then
 types=$(jq -Rc 'split(",")' <<<"${SPAWN_TYPES:-t3.small,t3.medium,t3.large}")
 policy='{"Version":"2012-10-17","Statement":[
   {"Effect":"Allow","Resource":"*","Action":["ec2:Describe*","ec2:RunInstances","ec2:CreateTags","ec2:StartInstances","ec2:StopInstances","ec2:TerminateInstances","ec2:CreateSecurityGroup","ec2:AuthorizeSecurityGroupIngress","ec2:CreateKeyPair"]},
@@ -43,11 +47,11 @@ policy='{"Version":"2012-10-17","Statement":[
 aws iam get-role --role-name femme >/dev/null 2>&1 || aws iam create-role --role-name femme --assume-role-policy-document \
   '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}' >/dev/null
 aws iam put-role-policy --role-name femme --policy-name femme-spawn --policy-document "$policy"
-# Plus everything but IAM: agents on the box run the whole account (spin things up and down) with no key on disk.
-aws iam attach-role-policy --role-name femme --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
 roles=$(aws iam get-instance-profile --instance-profile-name femme --query 'InstanceProfile.Roles[].RoleName' 2>/dev/null) \
   || { aws iam create-instance-profile --instance-profile-name femme >/dev/null; roles=; }
 [ "$roles" = femme ] || aws iam add-role-to-instance-profile --instance-profile-name femme --role-name femme
+profile=(--iam-instance-profile Name=femme)
+fi
 
 id=$(aws ec2 describe-instances --query 'Reservations[0].Instances[0].InstanceId' \
   --filters Name=tag:Name,Values=femme Name=instance-state-name,Values=pending,running,stopping,stopped)
@@ -58,12 +62,12 @@ if [ "$id" = None ]; then
   trap 'rm -f "$userdata"' EXIT
   sed -e "s|__USER__|$USER|g" -e "s|__HOST__|$HOST|g" -e "s|__PUBKEY__|$(cat ~/.ssh/id_ed25519.pub)|" cloud-init.yaml > "$userdata"
   id=$(retry aws ec2 run-instances --image-id "$ami" --instance-type "$INSTANCE_TYPE" \
-    --security-group-ids "$sg" --user-data "file://$userdata" --iam-instance-profile Name=femme \
+    --security-group-ids "$sg" --user-data "file://$userdata" ${profile[@]+"${profile[@]}"} \
     --block-device-mappings "DeviceName=/dev/sda1,Ebs={VolumeSize=$DISK_GB,VolumeType=gp3}" \
     --metadata-options HttpTokens=required,HttpPutResponseHopLimit=1 --disable-api-termination \
     --tag-specifications "$(tag instance)" "$(tag volume)" --query 'Instances[0].InstanceId')
 else
-  if [ "$(aws ec2 describe-iam-instance-profile-associations --filters "Name=instance-id,Values=$id" Name=state,Values=associated \
+  if [ ${#profile[@]} -gt 0 ] && [ "$(aws ec2 describe-iam-instance-profile-associations --filters "Name=instance-id,Values=$id" Name=state,Values=associated \
         --query 'IamInstanceProfileAssociations[0].IamInstanceProfile.Arn')" = None ]; then
     retry aws ec2 associate-iam-instance-profile --instance-id "$id" --iam-instance-profile Name=femme >/dev/null
   fi

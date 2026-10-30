@@ -11,16 +11,18 @@ r --delete --exclude=board/target ./ "$HOST:femme/"  # bootstrap.sh builds the b
 
 cd ~
 r -R --ignore-missing-args \
-  .claude/{CLAUDE.md,RTK.md,rules,skills,agents,hooks,settings.json,keybindings.json,plugins} \
+  .claude/{CLAUDE.md,rules,skills,agents,hooks,settings.json,keybindings.json,plugins} \
   .config/herdr/{config.toml,plugins,plugins.json} .config/mise/config.toml \
-  .local/bin/rtk \
   "$HOST:"
 
 # Claude's first-run flags, folder trust and the MCP servers that work headless.
 # Merged into the VPS copy, so its own login (oauthAccount) stays.
-jq --arg mcp "${CLAUDE_MCP:-context7 codegraph}" '{theme, hasCompletedOnboarding, lastOnboardingVersion,
+jq --arg mcp "${CLAUDE_MCP:-}" '{theme, hasCompletedOnboarding, lastOnboardingVersion,
     projects: (.projects // {} | map_values({hasTrustDialogAccepted})),
     mcpServers: (.mcpServers // {} | with_entries(select(.key as $k | $mcp | split(" ") | index($k))))}' ~/.claude.json \
   | ssh "$HOST" 'f=~/.claude.json; [ -s $f ] || echo {} > $f; jq -s ".[0] * .[1]" $f - > $f.tmp && mv $f.tmp $f'
 
-ssh "$HOST" "HERDR_VERSION=$(herdr --version | cut -d' ' -f2) ~/femme/bootstrap.sh"
+# The VPS runs the laptop's herdr version (the laptop's client talks to it); without herdr here, the one in .env.
+v=$(herdr --version 2>/dev/null | cut -d' ' -f2) || v=
+v=${v:-${HERDR_VERSION:?herdr is not installed here: set HERDR_VERSION in .env}}
+ssh "$HOST" "HERDR_VERSION=$v ~/femme/bootstrap.sh"

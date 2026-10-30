@@ -10,24 +10,14 @@ command -v mise >/dev/null || curl -fsSL https://mise.run | sh
 grep -q 'mise activate' ~/.bashrc || echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
 mise install -y || echo "WARN: some mise tools failed, see above" >&2
 
-command -v opencode >/dev/null || [ -x ~/.opencode/bin/opencode ] || curl -fsSL https://opencode.ai/install | bash
-command -v codegraph >/dev/null || curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
-# ponytail: whiteboard is a desktop app; the synced Claude hooks call it, so no-op it here.
-[ -e ~/.local/bin/whiteboard ] || printf '#!/bin/sh\nexit 0\n' > ~/.local/bin/whiteboard && chmod +x ~/.local/bin/whiteboard
 # Every Claude here runs as `claude --dangerously-skip-permissions` (same mode, no dialog): nobody is
 # at the keyboard to answer prompts. sync.sh copies the laptop's settings over this file first.
 mkdir -p ~/.claude; f=~/.claude/settings.json; [ -s $f ] || echo {} > $f
-# Subagents run on Opus or Sonnet, never Fable: this default covers agents that name no model, the hook
-# (hooks/subagent-model.sh) the rest. The hook entry is replaced, not duplicated, on every run.
 # Every session writes ~/.claude/debug/<session>.txt, so a turn that "hangs" has a timestamped record
 # (DEBUG_SDK is Claude's own switch; DEBUG=1 would leak into make and Django). A stream silent for
 # 60 s is retried, instead of the default 180 s.
-mkdir -p ~/.claude/hooks && install -m755 hooks/subagent-model.sh ~/.claude/hooks/femme-subagent-model.sh
 jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissionPrompt = true
-  | .env.CLAUDE_CODE_SUBAGENT_MODEL = "opus"
-  | .env.DEBUG_SDK = "1" | .env.CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS = "60000"
-  | .hooks.PreToolUse = [(.hooks.PreToolUse // [])[] | select(any(.hooks[]?; .command // "" | test("femme-subagent-model")) | not)]
-      + [{matcher: "Agent", hooks: [{type: "command", command: "bash ~/.claude/hooks/femme-subagent-model.sh"}]}]' $f > $f.tmp && mv $f.tmp $f
+  | .env.DEBUG_SDK = "1" | .env.CLAUDE_BYTE_STREAM_IDLE_TIMEOUT_MS = "60000"' $f > $f.tmp && mv $f.tmp $f
 
 # Same herdr version as the laptop: the laptop's client talks to this server.
 want=${HERDR_VERSION:?pass HERDR_VERSION}
@@ -69,14 +59,13 @@ esac
 install -m755 pc.sh ~/.local/bin/pc
 # The same rule for every agent: Claude reads ~/.claude/rules, Codex its global ~/.codex/AGENTS.md.
 mkdir -p ~/.claude/rules && cp rules/pc.md ~/.claude/rules/femme-pc.md
-# Skills from this repo: Claude reads ~/.claude/skills/<name>/SKILL.md (a session started after this sees it).
-mkdir -p ~/.claude/skills && rm -rf ~/.claude/skills/write-in-turkish && cp -r skills/write-in-turkish ~/.claude/skills/
 { [ -f ~/.codex/AGENTS.md ] && sed '/^<!-- femme pc start -->$/,/^<!-- femme pc end -->$/d' ~/.codex/AGENTS.md
   printf '<!-- femme pc start -->\n'; cat rules/pc.md; printf '<!-- femme pc end -->\n'
 } > ~/.codex/AGENTS.new && mv ~/.codex/AGENTS.new ~/.codex/AGENTS.md
 
 units="herdr-server herdr-instinct herdr-notify"
-if [ -n "${BOARD_URL:-}" ]; then
+if [ -n "${BOARD_URL:-}" ] && [ "${BOARD_PUBLIC:-0}" = 1 ]; then
+  # Optional (BOARD_PUBLIC=1): the board on the internet, for agents that call the API from elsewhere.
   # Caddy terminates HTTPS for the board (automatic certificate for BOARD_URL's host).
   command -v caddy >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq caddy; }
   # encode: the browser terminal polls the screen several times a second; compressed it is ~5x smaller.
@@ -106,6 +95,8 @@ ${BOARD_URL#https://} {
 }
 EOF
   sudo systemctl reload-or-restart caddy
+fi
+if [ -n "${BOARD_URL:-}" ]; then
   # Built here, not on the laptop, so a merge to main can deploy itself (deploy.sh).
   [ -x ~/.cargo/bin/cargo ] || curl -fsSL https://sh.rustup.rs | sh -s -- -y -q --profile minimal --no-modify-path
   ~/.cargo/bin/cargo build -q --release --manifest-path board/Cargo.toml
@@ -121,13 +112,16 @@ EOF
   # AWS CLI v2 for the agents (the instance role signs it in) and the board's accounts window. User-local, no sudo.
   aws --version >/dev/null 2>&1 || { t=$(mktemp -d) && curl -fsSL -o "$t/aws.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" \
     && unzip -q "$t/aws.zip" -d "$t" && "$t/aws/install" -i ~/.local/share/aws-cli -b ~/.local/bin --update >/dev/null && rm -rf "$t"; }
-  units="$units femme-board femme-worker femme-cswap femme-fable-cap"
+  units="$units femme-board femme-worker"
+  # Optional (ACCOUNT_ROTATION=1): move to another stored Claude account when the active one passes CAP.
+  [ "${ACCOUNT_ROTATION:-0}" != 1 ] || units="$units femme-cswap femme-fable-cap"
 fi
 
 mkdir -p ~/.config/systemd/user
 for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
 # Only the timer is started here: deploy.sh runs this script, and starting its own service would wait on itself.
-[ -z "${BOARD_URL:-}" ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
+# Optional (AUTODEPLOY=1): anyone who can merge to main can then run code on this box.
+[ "${AUTODEPLOY:-0}" != 1 ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
 systemctl --user daemon-reload
 systemctl --user enable --now $units
 # The plugin runs from this checkout (deploy.sh keeps it at main). sync.sh just copied the laptop's
@@ -136,6 +130,6 @@ if [ "$(herdr plugin list --json 2>/dev/null | jq -r '.result.plugins[] | select
   herdr plugin unlink femme >/dev/null 2>&1 || true
   herdr plugin link "$PWD" >/dev/null || echo "WARN: could not link the femme plugin from $PWD" >&2
 fi
-systemctl --user restart herdr-notify ${BOARD_URL:+femme-board femme-worker femme-cswap femme-fable-cap}
+systemctl --user restart $(printf '%s\n' $units | grep -vE '^(herdr-server|herdr-instinct|femme-deploy.timer)$')
 herdr server reload-config >/dev/null 2>&1 || true
 systemctl --user is-active $units

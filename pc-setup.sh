@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Laptop side, once (Arch/Omarchy): lets `pc` on the VPS run commands here, in a synced folder
+# Laptop side, once (Arch Linux; elsewhere install and enable openssh first): lets `pc` on the VPS run commands here, in a synced folder
 # (README: Work on PC files from the VPS). sshd listens on 127.0.0.1 only; the VPS reaches it
 # through the link this machine opens (femme-link.service), so nothing is exposed to the
 # network. Safe to rerun.

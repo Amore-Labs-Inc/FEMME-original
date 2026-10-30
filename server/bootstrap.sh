@@ -13,6 +13,8 @@ mise install -y || echo "WARN: some mise tools failed, see above" >&2
 # and the GitHub CLI (Ubuntu's package).
 command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash || echo "WARN: Claude Code did not install" >&2
 command -v gh >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq gh; } || echo "WARN: gh did not install" >&2
+# Optional (MOSH=1): a phone terminal over mosh (docs/notifications.md); UDP 60000-61000 must reach the server.
+[ "${MOSH:-0}" != 1 ] || command -v mosh-server >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq mosh; } || echo "WARN: mosh did not install" >&2
 
 # Every Claude here runs as `claude --dangerously-skip-permissions` (same mode, no dialog): nobody is
 # at the keyboard to answer prompts. sync.sh copies the laptop's settings over this file first.

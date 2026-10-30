@@ -13,7 +13,7 @@ git clone <this repo> femme && cd femme
 
 | `install.sh` does | You do |
 |---|---|
-| checks the tools this laptop needs, makes an SSH key if you have none | have a server: an AWS account, or an Ubuntu 24.04 VPS with an account that can `sudo` |
+| checks the tools this laptop needs (on macOS, a current rsync: `brew install rsync`), makes an SSH key if you have none | have a server: an AWS account, or an Ubuntu 24.04 VPS with an account that can `sudo` |
 | writes `.env`, with a random notification topic | sign in on the server once: `claude` then `/login`; `gh auth login && gh auth setup-git` |
 | prepares the server: your user, key-only SSH, swap, packages, start at boot | for a public board only: a DNS A record, and a Resend key if you want emailed sign-in links |
 | installs herdr, the agents and their toolchains, the board and the services | optional: `./laptop/laptop-setup.sh`, the phone apps |

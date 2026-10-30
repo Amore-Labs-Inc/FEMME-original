@@ -20,6 +20,7 @@ say "1/5 what this laptop needs"
 missing=
 for t in ssh rsync jq git curl; do command -v $t >/dev/null || missing="$missing $t"; done
 [ -z "$missing" ] || die "install first:$missing"
+rsync_ok || die "rsync is too old (macOS ships openrsync): $(rsync_fix)"
 [ -f ~/.ssh/id_ed25519 ] || {
   ask_yes "No ~/.ssh/id_ed25519. Make one now (no passphrase: the sync service has no ssh-agent)?" y || die "an ed25519 key is needed"
   ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519

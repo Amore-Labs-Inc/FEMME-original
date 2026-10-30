@@ -16,6 +16,7 @@ say "laptop"
 for t in ssh rsync jq git; do
   command -v $t >/dev/null && ok "$t" || no "$t is missing" "install $t with your package manager"
 done
+rsync_ok && ok "rsync $(rsync --version | sed -n '1s/^rsync  *version v\{0,1\}\([0-9.]*\).*/\1/p')" || no "rsync is too old (macOS ships openrsync)" "$(rsync_fix)"
 [ "$(stat -c %a .env 2>/dev/null || stat -f %Lp .env)" = 600 ] && ok ".env readable only by you" || no ".env is readable by others" "chmod 600 .env"
 command -v herdr >/dev/null && ok "herdr $(herdr --version 2>/dev/null | cut -d' ' -f2)" || opt "herdr not installed here (only needed to fork agents to the server)"
 command -v mutagen >/dev/null && ok "mutagen" || opt "mutagen not installed here (only needed to fork agents and sync folders)"

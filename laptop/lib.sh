@@ -32,6 +32,14 @@ Host $1
 EOF
 }
 
+# The copy scripts need rsync 3.2.3 or newer (--mkpath, --ignore-missing-args). macOS ships
+# openrsync, which has neither: brew install rsync puts a current one first on PATH.
+rsync_ok() {
+  local v; v=$(rsync --version 2>/dev/null | sed -n 's/^rsync  *version v\{0,1\}\([0-9][0-9.]*\).*/\1/p' | head -n 1)
+  [ -n "$v" ] && [ "$(printf '%s\n3.2.3\n' "$v" | sort -t. -k1,1n -k2,2n -k3,3n | head -n 1)" = 3.2.3 ]
+}
+rsync_fix() { case $(uname -s) in Darwin) echo "brew install rsync, then open a new terminal" ;; *) echo "install rsync 3.2.3 or newer with your package manager" ;; esac; }
+
 # y/n question; $2 is the default (y or n).
 ask_yes() {
   local a

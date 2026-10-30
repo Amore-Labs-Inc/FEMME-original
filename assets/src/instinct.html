@@ -1,0 +1,42 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
+:root{--w:1280px;--h:640px}
+.wrap{position:relative;padding:64px 88px;display:grid;grid-template-columns:430px 1fr;gap:64px;height:100%}
+.phone{border-radius:34px;padding:0;overflow:hidden;display:flex;flex-direction:column;height:512px}
+.top{display:flex;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--line)}
+.av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--violet),var(--ember));display:grid;place-items:center;color:#fff;font-weight:900;font-size:18px}
+.who b{display:block;font-size:17px;font-weight:700}.who span{font-size:13px;color:var(--muted)}
+.wa{margin-left:auto;font-family:GeistMono;font-size:11px;letter-spacing:.12em;color:#fff;background:var(--wa);border-radius:999px;padding:5px 10px}
+.chat{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:9px;font-size:15px;line-height:1.36}
+.b{max-width:86%;padding:10px 13px;border-radius:14px;color:var(--fg)}
+.me{align-self:flex-end;background:var(--bubble-me);border-bottom-right-radius:4px}
+.them{align-self:flex-start;background:var(--bubble-them);border:1px solid var(--line);border-bottom-left-radius:4px}
+.them ul{margin:6px 0 0 18px}.them li{margin:2px 0}
+.t{display:block;text-align:right;font-family:GeistMono;font-size:10.5px;color:var(--muted);margin-top:4px}
+.side{padding-top:18px}.side h2{font-weight:900;font-size:58px;margin-top:16px}
+.steps{margin-top:34px;display:grid;gap:14px}
+.s{display:grid;grid-template-columns:44px 1fr;gap:16px;align-items:start}
+.n{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-family:GeistMono;font-weight:500;font-size:16px;color:var(--accent);border:1px solid var(--line);background:var(--card)}
+.s b{font-size:20px;font-weight:700;letter-spacing:-.01em}.s p{font-size:16px;color:var(--muted);margin-top:3px}
+.s code{font-family:GeistMono;font-size:14px;color:var(--accent)}
+</style></head><body><div class="glow"></div><div class="dots"></div>
+<div class="wrap">
+ <div class="card phone">
+  <div class="top"><div class="av">I</div><div class="who"><b>Instinct</b><span>runs your agents through FEMME</span></div><div class="wa">WHATSAPP</div></div>
+  <div class="chat">
+   <div class="b me">Fix the signup form in example-repo<span class="t">09:41</span></div>
+   <div class="b them">On it. Claude is working on the server.<span class="t">09:41</span></div>
+   <div class="b them"><b>Done: the signup form works again</b><ul><li>Form checks the address before sending</li><li>All tests pass</li><li>Waiting for your yes to push</li></ul><span class="t">09:58</span></div>
+   <div class="b me">yes<span class="t">10:02</span></div>
+   <div class="b them">Pushed to main ✓<span class="t">10:02</span></div>
+  </div>
+ </div>
+ <div class="side"><div class="label">Example · Instinct on WhatsApp</div>
+  <h2>Text a task.<br><span class="accent">Say yes to ship it.</span></h2>
+  <div class="steps">
+   <div class="s"><div class="n">01</div><div><b>You write to Instinct</b><p>A plain sentence on WhatsApp. No laptop, no terminal.</p></div></div>
+   <div class="s"><div class="n">02</div><div><b>FEMME runs Claude on your server</b><p>Its own standing session: <code>POST /api/agents/instinct</code></p></div></div>
+   <div class="s"><div class="n">03</div><div><b>You read a short report</b><p>What changed for you, what was checked, what is open.</p></div></div>
+   <div class="s"><div class="n">04</div><div><b>Nothing ships without your yes</b><p>Yes pushes, no discards: <code>/push</code> · <code>/discard</code></p></div></div>
+  </div>
+ </div>
+</div></body></html>

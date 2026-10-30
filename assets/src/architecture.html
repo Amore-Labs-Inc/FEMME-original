@@ -1,0 +1,40 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
+:root{--w:1280px;--h:560px}
+.wrap{position:relative;padding:56px 88px}
+h2{font-weight:900;font-size:44px;margin-top:12px}
+.grid{position:absolute;left:88px;right:88px;top:178px;bottom:56px;display:grid;grid-template-columns:330px 1fr 470px;align-items:center}
+.ins{display:grid;gap:14px}
+.in{padding:14px 18px;display:flex;gap:14px;align-items:center}
+.ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-family:GeistMono;font-size:13px;font-weight:500;color:var(--accent);border:1px solid var(--line)}
+.in b{display:block;font-size:17px;font-weight:700}.in span{font-size:13.5px;color:var(--muted);font-family:GeistMono}
+.wa .ic{color:#fff;background:var(--wa);border:0}
+svg{width:100%;height:100%}
+.srv{padding:26px 28px}
+.srv .label{font-size:13px}
+.srv h3{font-size:26px;font-weight:900;letter-spacing:-.02em;margin:8px 0 18px}
+.box{border:1px dashed var(--line);border-radius:14px;padding:14px 16px;margin-top:12px}
+.box b{font-size:16px;font-weight:700}.box p{font-size:14px;color:var(--muted);margin-top:4px}
+.pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pill{font-family:GeistMono;font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--text)}
+.pill.on{color:#fff;background:var(--blue);border-color:var(--blue)}
+[data-theme=dark] .pill.on{background:var(--bright);border-color:var(--bright);color:var(--ink)}
+</style></head><body><div class="glow"></div><div class="dots"></div>
+<div class="wrap"><div class="label">How it fits together</div><h2>Everything talks to <span class="accent">one server you own.</span></h2></div>
+<div class="grid">
+ <div class="ins">
+  <div class="card in wa"><div class="ic">WA</div><div><b>Instinct on WhatsApp</b><span>HTTPS API · key</span></div></div>
+  <div class="card in"><div class="ic">⌘</div><div><b>Your laptop</b><span>ssh · two-way sync</span></div></div>
+  <div class="card in"><div class="ic">▦</div><div><b>Browser</b><span>the board</span></div></div>
+  <div class="card in"><div class="ic">◐</div><div><b>Phone, optional</b><span>mosh · ntfy</span></div></div>
+ </div>
+ <svg viewBox="0 0 200 360" preserveAspectRatio="none" fill="none" stroke-width="2">
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" style="stop-color:var(--line)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>
+  <path d="M0 45 C100 45 100 180 200 180" stroke="url(#g)"/><path d="M0 135 C100 135 100 180 200 180" stroke="url(#g)"/>
+  <path d="M0 225 C100 225 100 180 200 180" stroke="url(#g)"/><path d="M0 315 C100 315 100 180 200 180" stroke="url(#g)"/>
+ </svg>
+ <div class="card srv"><div class="label">your server · ubuntu 24.04</div><h3>herdr, always on</h3>
+  <div class="pills"><span class="pill on">Claude Code</span><span class="pill">Codex</span><span class="pill">Pi</span></div>
+  <div class="box"><b>Board &amp; API</b><p>issue queue · live terminals · standing sessions</p></div>
+  <div class="box"><b>Worker &amp; notifications</b><p>issues become pull requests · pings when an agent needs you</p></div>
+ </div>
+</div></body></html>

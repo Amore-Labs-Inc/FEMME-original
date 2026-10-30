@@ -11,6 +11,10 @@ Thanks for helping. One rule shapes everything here: **FEMME stays small.** It i
 - **No secrets, no personal data:** no keys, tokens, IPs, email addresses, hostnames or private repo names, in code, tests, docs or examples. Use `example-org/example-repo`, `203.0.113.7`, `hello@example.com`. CI runs gitleaks.
 - **Safe defaults:** anything that widens what the server or its agents can do (network exposure, cloud permissions, running code from elsewhere) is off by default and explained in `.env.example` and [SECURITY.md](SECURITY.md).
 
+## Visuals
+
+The README and docs images are HTML pages in `assets/src/`, in the Exposure brand (Geist, cream, Exposure Blue, the blue-violet-ember gradient on dark). Each renders in a light and a dark version; GitHub picks the one that matches the reader's theme. To change one, edit its page and run `assets/src/render.sh` (needs Google Chrome). Keep text in images short, and put the same meaning in the image's `alt`.
+
 ## How the pieces fit
 
 | File | Runs on | Does |

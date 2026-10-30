@@ -1,4 +1,7 @@
-# API: use FEMME from a chat bot or another agent
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-api-dark.png">
+  <img alt="FEMME docs: API & Instinct" src="../assets/docs-api-light.png" width="100%">
+</picture>
 
 You do not need a terminal on your phone. A chat bot you already talk to (on WhatsApp, say) can hand FEMME tasks through its API: make it a key on the board, give it `$BOARD_URL/api/openapi.json`, and it sends a task, reads Claude's short report and relays your yes or no (push or discard). If the bot runs on another machine, turn on the public board (`BOARD_PUBLIC=1`). Details below; [`examples/api-client.sh`](../examples/api-client.sh) is a minimal working client.
 

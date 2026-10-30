@@ -1,4 +1,7 @@
-# Install
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-install-dark.png">
+  <img alt="FEMME docs: Install" src="../assets/docs-install-light.png" width="100%">
+</picture>
 
 Everything starts on your laptop (Linux or macOS), from a checkout of this repo:
 

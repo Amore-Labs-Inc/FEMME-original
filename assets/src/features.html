@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
+:root{--w:1280px;--h:520px}
+.wrap{position:relative;padding:56px 88px}
+h2{font-weight:900;font-size:44px;margin-top:12px}
+.grid{position:absolute;left:88px;right:88px;bottom:56px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.f{padding:24px 22px;height:270px;display:flex;flex-direction:column}
+.f .g{width:48px;height:48px;border-radius:13px;border:1px solid var(--line);display:grid;place-items:center;color:var(--accent)}.f .g svg{width:26px;height:26px}
+.f b{font-size:21px;font-weight:700;letter-spacing:-.01em;margin-top:18px;line-height:1.15}
+.f p{font-size:15px;color:var(--muted);margin-top:10px;line-height:1.45}
+.f .tag{margin-top:auto;font-family:GeistMono;font-size:12px;letter-spacing:.1em;color:var(--muted)}
+</style></head><body><div class="glow"></div><div class="dots"></div>
+<div class="wrap"><div class="label">What you get</div><h2>Close the lid. <span class="accent">Agents keep working.</span></h2></div>
+<div class="grid">
+ <div class="card f"><div class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v4.5h-4.5"/></svg></div><b>Always on</b><p>herdr starts at boot. Terminals survive SSH drops; after a reboot the agents pick up where they were.</p><div class="tag">HERDR · SYSTEMD</div></div>
+ <div class="card f"><div class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h14"/><path d="M14 4l4 4-4 4"/><path d="M20 16H6"/><path d="M10 12l-4 4 4 4"/></svg></div><b>Fork to the server</b><p>One key moves a local agent, conversation and folder, onto the server. The folder stays in sync.</p><div class="tag">PREFIX + SHIFT + V</div></div>
+ <div class="card f"><div class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg></div><b>Tasks from a chat</b><p>A bot like Instinct hands tasks over the API and brings back a short report.</p><div class="tag">HTTPS API</div></div>
+ <div class="card f"><div class="g"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9 4.5v15M14.5 4.5v15M3.5 9.5h17"/></svg></div><b>A board for the queue</b><p>Issues become pull requests. Watch live terminals and step in from the browser.</p><div class="tag">ISSUES · TERMINALS</div></div>
+</div></body></html>

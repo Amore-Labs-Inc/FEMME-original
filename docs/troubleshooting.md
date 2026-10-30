@@ -1,4 +1,7 @@
-# Troubleshooting
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-troubleshooting-dark.png">
+  <img alt="FEMME docs: Troubleshooting" src="../assets/docs-troubleshooting-light.png" width="100%">
+</picture>
 
 Start with `./doctor.sh`: it checks the laptop, the server, the services, the sign-ins and the board, and prints the fix for each problem. Logs of a service on the server: `ssh <alias> journalctl --user -u <service> -n 50` (services: `herdr-server`, `herdr-notify`, `femme-board`, `femme-worker`, `femme-cswap`, `femme-fable-cap`, `femme-deploy`).
 

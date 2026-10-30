@@ -1,24 +1,59 @@
-# FEMME
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
+  <img alt="FEMME: your coding agents, always on. By Exposure." src="assets/banner-light.png" width="100%">
+</picture>
 
-Always-on [herdr](https://herdr.dev) on your own Linux server. Start coding agents (Claude Code, Codex, Pi) from your laptop, your phone or a chat bot, close the lid, come back later: they kept running on the server, and you find them where they ended up.
+<p align="center">
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-0339A6?style=flat-square"></a>
+  <img alt="Server: Ubuntu 24.04, x86_64 or arm64" src="https://img.shields.io/badge/server-Ubuntu%2024.04-0339A6?style=flat-square">
+  <img alt="Laptop: Linux or macOS" src="https://img.shields.io/badge/laptop-Linux%20%7C%20macOS-0339A6?style=flat-square">
+  <img alt="Agents: Claude Code, Codex, Pi" src="https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Pi-7C3AED?style=flat-square">
+</p>
 
-```
-  laptop ──── ssh, two-way folder sync ────┐
-  phone (optional) ──── mosh, ntfy ────────┤        your server (Ubuntu 24.04)
-  chat bot (Instinct) ── HTTPS API ────────┼──────▶  herdr ── Claude Code / Codex / Pi
-  browser ──── board ──────────────────────┘         board · worker · notifications
-```
+<p align="center"><b>Always-on <a href="https://herdr.dev">herdr</a> on your own Linux server.</b><br>
+Start coding agents from your laptop, your phone or a chat bot. Close the lid, come back later:<br>they kept running on the server, and you find them where they ended up.</p>
 
-- **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
-- **Move an agent to the server.** One key in herdr forks a local agent, with its conversation and folder, onto the server. The folder then stays in two-way sync, so the server's work shows up on the laptop when it wakes.
-- **Board and API.** A small web panel: an issue queue that agents turn into pull requests, live terminals, sessions. Its API lets a chat bot (like [Instinct](https://instinct.com/) on WhatsApp) or another agent hand tasks to a standing Claude Code session, read a short report and push or discard the changes.
-- **Notifications** on your phone when an agent needs you or is done.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/api.md">Use it from WhatsApp</a> ·
+  <a href="docs/install.md">Install guide</a> ·
+  <a href="#docs">Docs</a>
+</p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/features-dark.png">
+  <img alt="Always on: herdr starts at boot and agents resume after a reboot. Fork to the server: one key moves a local agent and its folder onto the server. Tasks from a chat: a bot like Instinct hands tasks over the API. A board for the queue: issues become pull requests, live terminals in the browser." src="assets/features-light.png" width="100%">
+</picture>
 
 ## Example: Instinct on WhatsApp
 
-We run FEMME this way. We write to [Instinct](https://instinct.com/) on WhatsApp: "fix the signup form in our repo". Instinct hands the task to FEMME through its API. Claude Code does the work on the server, checks it and writes a short report in plain words. Instinct sends us the report, and nothing is pushed until we answer "yes". No laptop and no terminal needed. See [API](docs/api.md).
+We run FEMME this way. We write to [Instinct](https://instinct.com/) on WhatsApp: "fix the signup form in our repo". Instinct hands the task to FEMME through its API. Claude Code does the work on the server, checks it and writes a short report in plain words. Instinct sends us the report, and nothing is pushed until we answer "yes". No laptop and no terminal needed.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/instinct-dark.png">
+  <img alt="A WhatsApp chat with Instinct: you ask it to fix the signup form, Instinct reports Claude is working on the server, then sends a short report, you answer yes, and it pushes to main." src="assets/instinct-light.png" width="100%">
+</picture>
+
+Any bot or agent can do the same with an API key: see [API](docs/api.md) and the [minimal client](examples/api-client.sh).
+
+## How it fits together
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/architecture-dark.png">
+  <img alt="Instinct on WhatsApp, your laptop, the browser and an optional phone all connect to one server you own, running herdr with Claude Code, Codex or Pi, the board and API, the worker and notifications." src="assets/architecture-light.png" width="100%">
+</picture>
+
+- **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
+- **Move an agent to the server.** One key in herdr forks a local agent, with its conversation and folder, onto the server. The folder then stays in two-way sync.
+- **Board and API.** An issue queue that agents turn into pull requests, live terminals, sessions, and the API that bots use.
+- **Notifications** on your phone when an agent needs you or is done.
 
 ## Quick start
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/install-dark.png">
+  <img alt="Install in three steps: run ./install.sh (automatic), sign in on the server once (you), check with ./doctor.sh (automatic)." src="assets/install-light.png" width="100%">
+</picture>
 
 On your laptop (Linux or macOS):
 
@@ -27,7 +62,7 @@ git clone <this repo> femme && cd femme
 ./install.sh
 ```
 
-It asks where FEMME should run (an Ubuntu 24.04 server you have, a new AWS instance, or this machine) and which optional parts you want. Then it prepares the server, installs everything and checks it. It does most of the work; **you** bring the server and sign in on it once (`claude` → `/login`, `gh auth login`). The [install guide](docs/install.md) lists exactly what is automatic and what is not.
+It asks where FEMME should run (an Ubuntu 24.04 server you have, a new AWS instance, or this machine) and which optional parts you want. Then it prepares the server, installs everything and checks it. **You** bring the server and sign in on it once (`claude` → `/login`, `gh auth login`). The [install guide](docs/install.md) lists exactly what is automatic and what is not.
 
 Afterwards: `./doctor.sh` checks everything, `./install.sh update` updates, `./uninstall.sh` takes it off.
 
@@ -36,8 +71,8 @@ Afterwards: `./doctor.sh` checks everything, `./install.sh update` updates, `./u
 | | |
 |---|---|
 | [Install](docs/install.md) | where it can run, what `install.sh` does, the board private or public, by hand |
+| [API & Instinct](docs/api.md) | use FEMME from a chat bot or another agent; a [minimal client](examples/api-client.sh) |
 | [Laptop](docs/laptop.md) | forking agents, folder sync, drop box, building on the laptop with `pc` |
-| [API](docs/api.md) | use FEMME from a chat bot or another agent; a [minimal client](examples/api-client.sh) |
 | [Board](docs/board.md) | issues, terminals and sessions in the browser |
 | [Phone](docs/phone.md) | optional: a terminal and notifications on the phone |
 | [Claude accounts](docs/accounts.md) | the accounts window, optional rotation between accounts |
@@ -48,9 +83,9 @@ Afterwards: `./doctor.sh` checks everything, `./install.sh update` updates, `./u
 
 ## Requirements
 
-- Laptop: Linux or macOS with `ssh`, `rsync`, `jq`, `git`, `curl`. herdr and [Mutagen](https://mutagen.io) only for forking agents and folder sync.
-- Server: Ubuntu 24.04 on x86_64 or arm64, reachable over SSH, with a user that can `sudo`; or an AWS account, and `provision.sh` makes one.
-- Accounts: Claude (for Claude Code) and GitHub. Optional: Codex or Pi, a domain and Resend for a public board.
+- **Laptop:** Linux or macOS with `ssh`, `rsync`, `jq`, `git`, `curl`. herdr and [Mutagen](https://mutagen.io) only for forking agents and folder sync.
+- **Server:** Ubuntu 24.04 on x86_64 or arm64, reachable over SSH, with a user that can `sudo`; or an AWS account, and `provision.sh` makes one.
+- **Accounts:** Claude (for Claude Code) and GitHub. Optional: Codex or Pi, a domain and Resend for a public board.
 
 ## Security
 
@@ -58,4 +93,9 @@ Agents on the server run without permission prompts, and anything running as you
 
 ## License
 
-Apache-2.0, see [LICENSE](LICENSE). FEMME builds on [herdr](https://herdr.dev) and other tools it installs but does not include; see [NOTICE](NOTICE).
+Apache-2.0, see [LICENSE](LICENSE). FEMME builds on [herdr](https://herdr.dev) and other tools it installs but does not include; see [NOTICE](NOTICE). The Exposure name and logos are trademarks of Exposure and are not covered by the license.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/footer-dark.png">
+  <img alt="FEMME, Apache-2.0, by Exposure" src="assets/footer-light.png" width="100%">
+</picture>

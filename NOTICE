@@ -16,3 +16,10 @@ these tools, each under its own license:
 
 The board is built from Rust crates listed in board/Cargo.lock, under their own
 licenses (mostly MIT and/or Apache-2.0).
+
+Visuals (assets/):
+- The Exposure name, wordmark and mark (assets/src/logo/) are trademarks of
+  Exposure. They are not licensed under Apache-2.0; do not reuse them outside
+  this project without permission.
+- Geist and Geist Mono (assets/src/fonts/), Copyright (c) 2023 Vercel, in
+  collaboration with basement.studio, SIL Open Font License 1.1 (OFL.txt).

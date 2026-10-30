@@ -25,7 +25,7 @@ FEMME never copies your credentials to the server: you sign in there yourself.
 
 | Option | Status | Limits |
 |---|---|---|
-| **An Ubuntu 24.04 x86_64 server you already have** (any VPS, a home server) | main target | ARM servers and other distributions are not supported (herdr is installed as `linux-x86_64`) |
+| **An Ubuntu 24.04 server you already have**, x86_64 or arm64 (any VPS, a home server, a local VM) | main target | other distributions are not supported |
 | **A new AWS instance** (`provision.sh`) | helper, optional | needs the AWS CLI signed in; it costs money (see [costs](costs.md)) |
 | **This machine** (Linux with systemd) | works | agents stop when the machine sleeps; forking to "the server" makes no sense here |
 | macOS as the server | not supported | needs systemd and apt |

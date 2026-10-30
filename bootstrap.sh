@@ -27,7 +27,7 @@ jq '.permissions.defaultMode = "bypassPermissions" | .skipDangerousModePermissio
 want=${HERDR_VERSION:?pass HERDR_VERSION}
 mkdir -p ~/.local/bin
 [ "$(herdr --version 2>/dev/null)" = "herdr $want" ] || {
-  curl -fsSL -o ~/.local/bin/herdr "https://github.com/herdrdev/herdr/releases/download/v$want/herdr-linux-x86_64"
+  curl -fsSL -o ~/.local/bin/herdr "https://github.com/herdrdev/herdr/releases/download/v$want/herdr-linux-$(uname -m)"
   chmod +x ~/.local/bin/herdr
 }
 # A macOS laptop's folders live under /Users/<you>; synced folders keep their path here, so /Users points at /home.

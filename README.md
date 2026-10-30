@@ -49,7 +49,7 @@ Afterwards: `./doctor.sh` checks everything, `./install.sh update` updates, `./u
 ## Requirements
 
 - Laptop: Linux or macOS with `ssh`, `rsync`, `jq`, `git`, `curl`. herdr and [Mutagen](https://mutagen.io) only for forking agents and folder sync.
-- Server: Ubuntu 24.04 on x86_64, reachable over SSH, with a user that can `sudo`; or an AWS account, and `provision.sh` makes one.
+- Server: Ubuntu 24.04 on x86_64 or arm64, reachable over SSH, with a user that can `sudo`; or an AWS account, and `provision.sh` makes one.
 - Accounts: Claude (for Claude Code) and GitHub. Optional: Codex or Pi, a domain and Resend for a public board.
 
 ## Security

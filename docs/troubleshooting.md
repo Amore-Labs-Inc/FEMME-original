@@ -17,7 +17,7 @@ Start with `./doctor.sh`: it checks the laptop, the server, the services, the si
 | `pc: ... is not shared from the laptop` | that folder is not in sync | on the laptop: `sh sync-dir.sh <folder>` |
 | A file shows a conflict, neither side changes | both sides edited it; Mutagen pauses it instead of overwriting | `mutagen sync list`, keep the right copy, delete the other |
 | Agents pause with `paused at N% of the 5-hour window` | the worker leaves the rest of the window to you (`CAP` in `.env`) | wait for the reset, raise `CAP`, or turn on account rotation |
-| `./install.sh`: `must run Ubuntu 24.04 on x86_64` | another OS or an ARM server | use an Ubuntu 24.04 x86_64 server |
+| `./install.sh`: `must run Ubuntu 24.04 on x86_64 or arm64` | another OS or release | use Ubuntu 24.04 |
 
 ## When a turn takes forever
 

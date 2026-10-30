@@ -15,8 +15,8 @@ pub=~/.ssh/id_ed25519.pub
 [ -f "$pub" ] || die "no $pub: make one with ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519"
 
 say "checking $server"
-ssh -o ConnectTimeout=10 "$admin" 'grep -q "^VERSION_ID=\"24.04\"" /etc/os-release && [ "$(uname -m)" = x86_64 ]' \
-  || die "$server must run Ubuntu 24.04 on x86_64 (herdr ships for linux-x86_64)"
+ssh -o ConnectTimeout=10 "$admin" 'grep -q "^VERSION_ID=\"24.04\"" /etc/os-release && case $(uname -m) in x86_64|aarch64) ;; *) exit 1 ;; esac' \
+  || die "$server must run Ubuntu 24.04 on x86_64 or arm64 (aarch64)"
 
 say "preparing $server for user $USER"
 # The script goes over stdin; user, key and host name as arguments.

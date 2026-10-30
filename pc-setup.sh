@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Laptop side, once (Linux: Arch, Debian/Ubuntu or Fedora): lets `pc` on the VPS run commands here, in a synced folder
-# (README: Work on PC files from the VPS). sshd listens on 127.0.0.1 only; the VPS reaches it
+# (docs/laptop.md: Work on PC files from the VPS). sshd listens on 127.0.0.1 only; the VPS reaches it
 # through the link this machine opens (femme-link.service), so nothing is exposed to the
 # network. Safe to rerun.
 set -euo pipefail
@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 . ./.env
 
 command -v mutagen >/dev/null && systemctl --user is-enabled -q mutagen \
-  || { echo "pc-setup: install mutagen and enable mutagen.service first (README, Laptop)" >&2; exit 1; }
+  || { echo "pc-setup: install mutagen and enable mutagen.service first (./laptop-setup.sh)" >&2; exit 1; }
 
 [ "$(uname -s)" = Linux ] || { echo "pc-setup: pc needs a Linux laptop for now" >&2; exit 1; }
 if command -v pacman >/dev/null; then sudo pacman -S --needed --noconfirm openssh

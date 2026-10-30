@@ -9,6 +9,10 @@ export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
 command -v mise >/dev/null || curl -fsSL https://mise.run | sh
 grep -q 'mise activate' ~/.bashrc || echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
 mise install -y || echo "WARN: some mise tools failed, see above" >&2
+# Without a mise list from the laptop, the two the board and worker need: Claude Code (its own installer)
+# and the GitHub CLI (Ubuntu's package).
+command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash || echo "WARN: Claude Code did not install" >&2
+command -v gh >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq gh; } || echo "WARN: gh did not install" >&2
 
 # Every Claude here runs as `claude --dangerously-skip-permissions` (same mode, no dialog): nobody is
 # at the keyboard to answer prompts. sync.sh copies the laptop's settings over this file first.

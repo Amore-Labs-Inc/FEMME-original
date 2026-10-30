@@ -53,7 +53,7 @@ else ok "herdr $v"; fi
 case $(fact claude) in
   in) ok "Claude Code signed in" ;;
   out) no "Claude Code is not signed in on the server" "ssh $HOST, run claude, then /login" ;;
-  *) no "Claude Code is not installed on the server" "add it to ~/.config/mise/config.toml, then ./sync.sh" ;;
+  *) no "Claude Code is not installed on the server" "./sync.sh (it installs Claude Code)" ;;
 esac
 [ "$(fact gh)" = in ] && ok "GitHub CLI signed in" || no "GitHub CLI is not signed in on the server" "ssh $HOST 'gh auth login && gh auth setup-git'"
 [ "$(fact linger)" = yes ] && ok "services start at boot (linger)" || no "services stop when you log out" "ssh $HOST sudo loginctl enable-linger \$USER"

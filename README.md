@@ -5,14 +5,18 @@ Always-on [herdr](https://herdr.dev) on your own Linux server. Start coding agen
 ```
   laptop ──── ssh, two-way folder sync ────┐
   phone (optional) ──── mosh, ntfy ────────┤        your server (Ubuntu 24.04)
-  chat bot or agent ──── HTTPS API ────────┼──────▶  herdr ── Claude Code / Codex / Pi
+  chat bot (Instinct) ── HTTPS API ────────┼──────▶  herdr ── Claude Code / Codex / Pi
   browser ──── board ──────────────────────┘         board · worker · notifications
 ```
 
 - **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
 - **Move an agent to the server.** One key in herdr forks a local agent, with its conversation and folder, onto the server. The folder then stays in two-way sync, so the server's work shows up on the laptop when it wakes.
-- **Board and API.** A small web panel: an issue queue that agents turn into pull requests, live terminals, sessions. Its API lets a chat bot (on WhatsApp, say) or another agent hand tasks to a standing Claude Code session, read a short report and push or discard the changes.
+- **Board and API.** A small web panel: an issue queue that agents turn into pull requests, live terminals, sessions. Its API lets a chat bot (like [Instinct](https://instinct.com/) on WhatsApp) or another agent hand tasks to a standing Claude Code session, read a short report and push or discard the changes.
 - **Notifications** on your phone when an agent needs you or is done.
+
+## Example: Instinct on WhatsApp
+
+We run FEMME this way. We write to [Instinct](https://instinct.com/) on WhatsApp: "fix the signup form in our repo". Instinct hands the task to FEMME through its API. Claude Code does the work on the server, checks it and writes a short report in plain words. Instinct sends us the report, and nothing is pushed until we answer "yes". No laptop and no terminal needed. See [API](docs/api.md).
 
 ## Quick start
 

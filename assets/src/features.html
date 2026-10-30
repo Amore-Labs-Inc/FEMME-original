@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
+:root{--w:1280px;--h:590px}
+.top{position:absolute;left:var(--edge);top:64px}
+h2{font-size:44px}
+.grid{position:absolute;left:var(--edge);right:var(--edge);top:208px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.f{padding:24px 26px;height:162px}
+.f .tagline{margin-bottom:10px}
+.f b{font-size:21px;font-weight:700;letter-spacing:-.01em}
+.f p{font-size:15px;color:var(--muted);margin-top:6px;line-height:1.45}
+</style></head><body>
+<div class="top"><div class="kicker">What it does</div><h2>Agents that don't stop when <span class="accent">your laptop does</span></h2></div>
+<div class="grid">
+ <div class="card f"><div class="tagline">Lid closed · server rebooted · still running</div><b>Survives sleep and reboots</b><p>Agents run on your server under herdr. After a reboot they come back in the same layout and pick up the same conversation.</p></div>
+ <div class="card f"><div class="tagline">One key: prefix + shift + v</div><b>Move a running agent to the server</b><p>The agent, its conversation and its folder move over. The folder stays in sync both ways, so the work shows up on your laptop.</p></div>
+ <div class="card f"><div class="tagline">Issue in, pull request out</div><b>A queue that turns into PRs</b><p>Add an issue on the board. FEMME gives it a branch and a Claude Code session and opens the pull request. Two at a time by default.</p></div>
+ <div class="card f"><div class="tagline">Notifications when it needs you</div><b>Watch or step in from anywhere</b><p>Live terminals in the browser, a push to your phone when an agent is waiting for you or done.</p></div>
+</div>
+</body></html>

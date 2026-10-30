@@ -1,34 +1,39 @@
 <!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
-:root{--w:1280px;--h:640px}
-.top{position:absolute;left:var(--edge);top:64px}
-h2{font-size:36px}
-.grid{position:absolute;left:var(--edge);right:var(--edge);top:200px;display:grid;grid-template-columns:372px 1fr;column-gap:44px;row-gap:16px}
-.colh{font-family:GeistMono;font-weight:500;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:10px;padding-bottom:4px}
-.av{width:26px;height:26px;border-radius:50%;background:var(--panel);display:grid;place-items:center;flex:none}.av .instinct{height:15px}
-.b{max-width:94%;padding:9px 13px;border-radius:12px;font-size:14.5px;line-height:1.4;align-self:start}
-.me{justify-self:end;background:var(--fg);color:var(--bg)}
-.them{justify-self:start;background:var(--panel);color:var(--fg);display:flex;gap:10px}
-.them .av{width:28px;height:28px;background:var(--bg)}
-.them ul{margin:4px 0 0 16px}
-.t{font-family:GeistMono;font-size:10.5px;opacity:.6;margin-left:8px}
-.http{font-family:GeistMono;font-size:12.5px;line-height:1.6;color:var(--text);align-self:start}
-.http .m{color:var(--fg);font-weight:500}
-.http .c{color:var(--muted)}
+:root{--w:1280px;--h:660px}
+.phone{position:absolute;left:var(--edge);top:64px;width:400px;height:532px;border-radius:30px;overflow:hidden;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--rule)}
+.av{width:38px;height:38px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none}.av .instinct{height:22px}
+.who b{display:block;font-size:16px;font-weight:700}.who span{font-size:12.5px;color:var(--muted)}
+.chat{flex:1;padding:16px;display:flex;flex-direction:column;gap:9px;font-size:14.5px;line-height:1.38;background:var(--bg)}
+.b{max-width:86%;padding:9px 12px;border-radius:14px}
+.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.them{align-self:flex-start;background:var(--panel);color:var(--fg);border-bottom-left-radius:4px}
+.them ul{margin:5px 0 0 17px}.them li{margin:1px 0}
+.t{display:block;text-align:right;font-family:GeistMono;font-size:10px;opacity:.6;margin-top:3px}
+.side{position:absolute;left:592px;right:var(--edge);top:82px}
+h2{font-size:42px}
+.steps{margin-top:34px;display:grid;gap:20px}
+.s{border-left:4px solid var(--accent);padding-left:18px}
+.s b{font-size:19px;font-weight:700;letter-spacing:-.01em}
+.s p{font-size:15.5px;color:var(--muted);margin-top:4px;line-height:1.45}
 </style></head><body>
-<div class="top"><div class="kicker">Example · Instinct on WhatsApp</div><h2>What each message does on your <span class="accent">server</span></h2></div>
-<div class="grid">
- <div class="colh"><span class="av"><img class="instinct"></span>Instinct · WhatsApp</div><div class="colh">FEMME API · your server</div>
-
- <div class="b me">Fix the signup form in example-org/app<span class="t">09:41</span></div>
- <div class="http sig"><span class="m">POST /api/agents/instinct</span>  {"text":"Fix the signup…","repo":"example-org/app"}<br><span class="c">clones to ~/femme-work/instinct, starts Claude Code in herdr</span><br>200 {"pane_id":"instinct~w3:p1","status":"working"}</div>
-
- <div class="b them"><span class="av"><img class="instinct"></span><div>Claude is on it.<span class="t">09:41</span></div></div>
- <div class="http sig"><span class="m">GET /api/agents/instinct</span>  <span class="c">polled while it works</span><br>200 {"status":"working","screen":"…"}</div>
-
- <div class="b them"><span class="av"><img class="instinct"></span><div><b>Signup works again.</b><ul><li>Email check runs before sending</li><li>Tests pass</li><li>Not pushed yet: yes or no?</li></ul><span class="t">09:58</span></div></div>
- <div class="http sig"><span class="m">GET /api/agents/instinct</span><br>200 {"status":"idle","pushed":false,"report":"Signup works again. …",<br>     "message":"changes ready, not pushed to main: read the report, then …"}<br><span class="c">report: Claude's plain-words summary, ~/.local/state/femme/report-instinct.md</span></div>
-
- <div class="b me">yes<span class="t">10:02</span></div>
- <div class="http sig"><span class="m">POST /api/agents/instinct/push</span><br><span class="c">Claude commits the task as one commit and pushes to main. "no" → /discard</span></div>
+<div class="card phone">
+ <div class="top"><div class="av"><img class="instinct"></div><div class="who"><b>Instinct</b><span>WhatsApp · runs your agents through FEMME</span></div></div>
+ <div class="chat">
+  <div class="b me">Fix the signup form in example-org/app<span class="t">09:41</span></div>
+  <div class="b them">On it. Claude is working on your server.<span class="t">09:41</span></div>
+  <div class="b them"><b>The signup form works again.</b><ul><li>Emails are checked before sending</li><li>All tests pass</li><li>Nothing pushed yet. Push it?</li></ul><span class="t">09:58</span></div>
+  <div class="b me">yes<span class="t">10:02</span></div>
+  <div class="b them">Pushed to main as one commit.<span class="t">10:02</span></div>
+ </div>
+</div>
+<div class="side"><div class="kicker">Example · Instinct on WhatsApp</div>
+ <h2>Text a task.<br><span class="accent">It ships when you say yes.</span></h2>
+ <div class="steps">
+  <div class="s"><b>You write one sentence on WhatsApp</b><p>Which repo, what to change. No laptop, no terminal.</p></div>
+  <div class="s"><b>Claude Code does it on your server</b><p>Instinct hands the task to FEMME; Claude makes the change and runs the tests.</p></div>
+  <div class="s"><b>You get five lines, not a diff</b><p>What changed for you, what was checked, what needs your decision.</p></div>
+  <div class="s"><b>Yes pushes, no throws it away</b><p>Until you answer, your repo is untouched.</p></div>
+ </div>
 </div>
 </body></html>

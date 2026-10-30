@@ -1,43 +1,34 @@
 <!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
-:root{--w:1280px;--h:620px}
+:root{--w:1280px;--h:580px}
 .top{position:absolute;left:var(--edge);top:64px}
-h2{font-size:36px}
-.cl{position:absolute;left:var(--edge);top:200px;width:318px}
-.cl .row{height:88px;padding-top:12px;border-top:1px solid var(--rule)}
-.cl b{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
-.av{width:22px;height:22px;border-radius:50%;background:var(--panel);display:grid;place-items:center}.av .instinct{height:13px}
-.cl .p{font-family:GeistMono;font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px}
-svg{position:absolute;left:446px;top:200px;width:84px;height:352px}
-.srv{position:absolute;left:530px;right:var(--edge);top:188px;padding:4px 22px 14px}
-table{width:100%;border-collapse:collapse;font-size:13.5px}
-td{padding:8px 0;border-top:1px solid var(--rule);vertical-align:top;line-height:1.4}
-tr:first-child td{border-top:0}
-td:nth-child(1){font-family:GeistMono;font-size:12.5px;color:var(--fg);width:150px;font-weight:500}
-td:nth-child(2){font-family:GeistMono;font-size:12px;color:var(--muted);width:120px}
-td:nth-child(3){color:var(--text)}
-tr.opt td{color:var(--muted)} tr.opt td:first-child{color:var(--muted)}
-.foot{font-family:GeistMono;font-size:11.5px;color:var(--muted);margin-top:8px}
+h2{font-size:44px}
+.ins{position:absolute;left:var(--edge);top:212px;width:330px;display:grid;gap:12px}
+.in{padding:14px 18px;display:flex;gap:14px;align-items:center}
+.av{width:38px;height:38px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none;font-family:GeistMono;font-size:10px;letter-spacing:.04em;color:var(--accent);font-weight:500}.av .instinct{height:22px}
+.in b{display:block;font-size:16px;font-weight:700}.in span{font-size:13.5px;color:var(--muted)}
+svg{position:absolute;left:458px;top:212px;width:110px;height:324px}
+.srv{position:absolute;left:568px;right:var(--edge);top:212px;padding:24px 26px}
+.srv h3{font-size:24px;font-weight:900;letter-spacing:-.02em}
+.srv .note{font-size:14px;color:var(--muted);margin-top:4px}
+.row{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--rule);font-size:14.5px}
+.note+.row{margin-top:18px}
+.row b{font-weight:600}.row span{color:var(--muted)}
 </style></head><body>
-<div class="top"><div class="kicker">How it fits together</div><h2>What runs where: one server, <span class="accent">nothing exposed</span> by default</h2></div>
-<div class="cl">
- <div class="row"><b><span class="av"><img class="instinct"></span>Instinct, or any bot</b><div class="p">HTTPS · Bearer key · /api/agents/{name}<br>needs BOARD_PUBLIC=1 (Caddy :443)</div></div>
- <div class="row"><b>Laptop</b><div class="p">ssh, mosh · herdr client · Mutagen sync<br>femme-link: its terminals on the board</div></div>
- <div class="row"><b>Browser</b><div class="p">ssh -L 8787 by default, or HTTPS<br>magic-link sign-in</div></div>
- <div class="row" style="border-bottom:1px solid var(--rule)"><b>Phone, optional</b><div class="p">mosh UDP 60000-61000 · ntfy push</div></div>
+<div class="top"><div class="kicker">How it fits together</div><h2>Everything talks to <span class="accent">one server you own</span></h2></div>
+<div class="ins">
+ <div class="card in"><div class="av"><img class="instinct"></div><div><b>Instinct on WhatsApp</b><span>sends tasks over the API</span></div></div>
+ <div class="card in"><div class="av">SSH</div><div><b>Your laptop</b><span>moves agents, syncs folders</span></div></div>
+ <div class="card in"><div class="av">WEB</div><div><b>Browser</b><span>the board: queue and live terminals</span></div></div>
+ <div class="card in"><div class="av">MOSH</div><div><b>Phone, optional</b><span>a terminal and notifications</span></div></div>
 </div>
-<svg viewBox="0 0 84 352" fill="none" stroke-width="1.25" style="stroke:var(--muted)">
- <path d="M0 44 C50 44 40 130 84 130"/><path d="M0 132 C50 132 40 160 84 160"/>
- <path d="M0 220 C50 220 40 190 84 190"/><path d="M0 308 C50 308 40 220 84 220"/>
+<svg viewBox="0 0 110 324" fill="none" stroke-width="1.5" style="stroke:var(--accent)">
+ <path d="M0 33 C60 33 50 162 110 162"/><path d="M0 115 C60 115 50 162 110 162"/>
+ <path d="M0 209 C60 209 50 162 110 162"/><path d="M0 291 C60 291 50 162 110 162"/>
 </svg>
-<div class="panel srv"><div class="cap" style="padding-left:0">Your server · systemctl --user</div>
-<table>
- <tr><td>herdr-server</td><td>unix socket</td><td>terminals and agents: Claude Code, Codex, Pi; back after a reboot</td></tr>
- <tr><td>herdr-instinct</td><td>unix socket</td><td>herdr session for API agents, one standing session per name</td></tr>
- <tr><td>femme-board</td><td>127.0.0.1:8787</td><td>web board and HTTP API (Rust)</td></tr>
- <tr><td>femme-worker</td><td>–</td><td>board issue → branch femme/issue-N → pull request</td></tr>
- <tr><td>herdr-notify</td><td>→ ntfy.sh</td><td>push when an agent is blocked or done</td></tr>
- <tr class="opt"><td>caddy</td><td>:80 :443</td><td>BOARD_PUBLIC=1: HTTPS in front of the board</td></tr>
- <tr class="opt"><td>femme-cswap</td><td>–</td><td>ACCOUNT_ROTATION=1: switch Claude accounts at CAP</td></tr>
-</table>
-<div class="foot">state ~/.local/state/femme · clones ~/femme-work · settings .env (mode 600)</div></div>
+<div class="card srv"><div class="kicker">Your server · Ubuntu 24.04</div><h3 style="margin-top:10px">FEMME on herdr</h3><div class="note">Nothing is open to the internet unless you turn it on.</div>
+ <div class="row"><b>Agents</b><span>Claude Code, Codex, Pi, each in its own terminal, running day and night</span></div>
+ <div class="row"><b>Board &amp; API</b><span>the issue queue, live terminals, and the API Instinct calls</span></div>
+ <div class="row"><b>Worker</b><span>turns issues into branches and pull requests</span></div>
+ <div class="row"><b>Notifications</b><span>a push when an agent is waiting for you or done</span></div>
+</div>
 </body></html>

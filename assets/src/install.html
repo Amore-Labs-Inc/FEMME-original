@@ -1,37 +1,18 @@
 <!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
-:root{--w:1280px;--h:640px}
+:root{--w:1280px;--h:440px}
 .top{position:absolute;left:var(--edge);top:64px}
-h2{font-size:36px}
-.lp{position:absolute;left:var(--edge);top:200px;width:560px}
-.rp{position:absolute;left:712px;right:var(--edge);top:200px}
-pre{font-size:12px}
-.notes{margin-top:22px;display:grid;gap:16px;font-size:14px;line-height:1.5;color:var(--text)}
-.notes b{font-weight:600;color:var(--fg)}
+h2{font-size:44px}
+.row{position:absolute;left:var(--edge);right:var(--edge);top:212px;display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.st{padding:24px 24px;height:170px;position:relative}
+.st b{display:block;font-size:20px;font-weight:700;letter-spacing:-.01em;margin-top:10px}
+.st p{font-size:14.5px;color:var(--muted);margin-top:6px;line-height:1.45}
+.st code{position:absolute;left:24px;bottom:20px;font-family:GeistMono;font-size:14px;color:var(--fg)}
+.you{color:var(--fg)}
 </style></head><body>
-<div class="top"><div class="kicker">Install · on your laptop</div><h2>One script asks, prepares, installs and <span class="accent">checks</span></h2></div>
-<div class="panel lp"><div class="cap">./install.sh</div><pre><span class="p">$</span> ./install.sh
-<span class="h">1/5 what this laptop needs</span>
-<span class="h">2/5 settings (.env, readable only by you)</span>
-Where will FEMME run?
-  1) a new AWS instance (needs the AWS CLI signed in; it costs money)
-  2) an Ubuntu 24.04 server you already have (any VPS or a home server ...)
-  3) this machine (Linux only; agents stop when it sleeps)
-1, 2 or 3: 2
-Short name for the server (ssh alias) [agentbox]:
-Use the board (web panel, issue queue, API for other agents)? [Y/n] y
-Must another machine reach the board over the internet (...)? [y/N] y
-<span class="h">3/5 the server</span>
-An account on the server that can sudo, as user@address: root@203.0.113.7
-<span class="h">4/5 installing on agentbox (a few minutes the first time)</span>
-<span class="h">5/5 checking</span></pre></div>
-<div class="rp"><div class="panel"><div class="cap">./doctor.sh · at the end, and any time</div><pre><span class="h">server (agentbox)</span>
-  ok   ssh agentbox
-  ok   herdr-server running
-  ok   femme-board running
-  ok   herdr 0.9.5
-  <span class="a">fix  Claude Code is not signed in on the server</span>
-  <span class="a">     -> ssh agentbox, run claude, then /login</span>
-  ok   services start at boot (linger)</pre></div>
-<div class="notes"><div class="sig"><b>Automatic:</b> your user, key-only SSH, swap, herdr, Claude Code, gh, the board, the systemd services, ~/.ssh/config.</div>
-<div class="sig"><b>You, once:</b> bring the server; sign in on it (claude, then /login; gh auth login). Credentials are never copied.</div></div></div>
+<div class="top"><div class="kicker">Install</div><h2>One command sets it up. <span class="accent">You sign in once.</span></h2></div>
+<div class="row">
+ <div class="card st"><div class="tagline">01 · Automatic</div><b>Answer a few questions</b><p>Your own server or a new AWS one, and which extras to turn on.</p><code>./install.sh</code></div>
+ <div class="card st"><div class="tagline you">02 · You, once</div><b>Sign in to Claude and GitHub</b><p>On the server. FEMME never copies your passwords or tokens.</p><code>claude → /login</code></div>
+ <div class="card st"><div class="tagline">03 · Automatic</div><b>See what is left to fix</b><p>Every check, each problem with the one command that fixes it.</p><code>./doctor.sh</code></div>
+</div>
 </body></html>

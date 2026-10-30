@@ -53,3 +53,7 @@ pre .a { color: var(--accent); font-weight: 500; } /* the one thing that matters
 /* Exposure wordmark: the provided files only, never retyped or boxed. */
 .wordmark { content: url(logo/exposure-wordmark-black.svg); }
 [data-theme=dark] .wordmark { content: url(logo/exposure-wordmark-white.svg); }
+
+/* Showcase cards: white on cream, 16 px radius, no border, no shadow. */
+.card { background: var(--panel); border-radius: 16px; }
+.tagline { font-family: GeistMono; font-weight: 500; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }

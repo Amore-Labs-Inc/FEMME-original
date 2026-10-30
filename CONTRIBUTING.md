@@ -13,7 +13,7 @@ Thanks for helping. One rule shapes everything here: **FEMME stays small.** It i
 
 ## Visuals
 
-The README images are HTML pages in `assets/src/`, set by the Exposure brand kit: flat cream (Ink on dark), Geist Black headlines at -2%, Geist Mono caps kickers, one accent (Exposure Blue, Bright Blue on dark), the 4 px blue bar on the left, white panels with no border or shadow, no gradients or textures. They show real commands and real output, nothing decorative. Each renders in a light and a dark version; GitHub picks the one that matches the reader's theme. To change one, edit its page and run `assets/src/render.sh` (needs Google Chrome). Keep text in images short, and put the same meaning in the image's `alt`.
+The README images are HTML pages in `assets/src/`, set by the Exposure brand kit: flat Academy Cream, Geist Black headlines at -2%, Geist Mono caps kickers, one accent (Exposure Blue), the 4 px blue bar, white cards with no border or shadow, no gradients or textures. Every card says something true about FEMME; no slogans for their own sake. To change one, edit its page and run `assets/src/render.sh` (needs Google Chrome). Keep text in images short, and put the same meaning in the image's `alt`.
 
 ## How the pieces fit
 

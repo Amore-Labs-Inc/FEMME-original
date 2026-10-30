@@ -40,6 +40,7 @@ sudo ln -sf ~/.local/bin/herdr /usr/local/bin/herdr
 mkdir -p ~/.codex ~/.pi/agent ~/.config/opencode
 for a in claude codex pi opencode; do herdr integration install "$a" || echo "WARN: $a integration failed" >&2; done
 
+mkdir -p ~/.config/herdr  # absent when the laptop has no herdr config to sync
 grep -q '^\[experimental\]' ~/.config/herdr/config.toml 2>/dev/null \
   || printf '\n[experimental]\n# single-user box: keep screen history across reboots\npane_history = true\n' >> ~/.config/herdr/config.toml
 
@@ -112,6 +113,8 @@ if [ -n "${BOARD_URL:-}" ]; then
   cp board/target/release/femme-board ~/.local/bin/femme-board.new
   mv ~/.local/bin/femme-board.new ~/.local/bin/femme-board
   # cswap: the board's accounts window and femme-cswap's auto-rotation. Its own venv, pinned.
+  # Ubuntu ships python3 without venv's ensurepip.
+  python3 -c 'import ensurepip' 2>/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv; }
   ~/.local/share/cswap/bin/cswap --version >/dev/null 2>&1 \
     || { python3 -m venv --clear ~/.local/share/cswap && ~/.local/share/cswap/bin/pip install -q claude-swap==0.27.2; }
   ln -sf ~/.local/share/cswap/bin/cswap ~/.local/bin/cswap

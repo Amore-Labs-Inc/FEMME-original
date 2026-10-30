@@ -1,0 +1,10 @@
+<svg width="64" height="64" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="exposureMarkGradient" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0339A6"/>
+      <stop offset="0.52" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#E8763C"/>
+    </linearGradient>
+  </defs>
+  <path d="M38.804 36.493c.936 1.25-1.061 3.247-2.311 2.311-13.57-10.147-20.37-10.147-33.94 0-1.25.936-3.247-1.061-2.312-2.311 10.148-13.57 10.148-20.37 0-33.94-.935-1.25 1.062-3.247 2.312-2.311 13.57 10.147 20.37 10.147 33.94 0 1.25-.936 3.247 1.061 2.311 2.311-10.147 13.57-10.147 20.37 0 33.94Z" fill="url(#exposureMarkGradient)"/>
+</svg>

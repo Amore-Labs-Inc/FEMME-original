@@ -1,7 +1,0 @@
-[Unit]
-Description=FEMME deploy: when main moves on GitHub, check it out and rerun bootstrap.sh
-
-[Service]
-Type=oneshot
-Environment=PATH=%h/.cargo/bin:%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=%h/femme/deploy.sh

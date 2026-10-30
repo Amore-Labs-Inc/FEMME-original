@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
+:root{--w:1280px;--h:680px}
+.wrap{position:relative;padding:64px 88px;display:grid;grid-template-columns:430px 1fr;gap:64px;height:100%}
+/* WhatsApp's own look, so the phone reads as WhatsApp at a glance. */
+:root{--wa-head:#008069;--wa-bg:#EFEAE2;--wa-out:#D9FDD3;--wa-in:#FFFFFF;--wa-text:#111B21;--wa-time:#667781;--wa-tick:#53BDEB;--wa-green:#00A884;--wa-bar:#F0F2F5;--wa-field:#FFFFFF;--wa-doodle:rgba(17,27,33,.06)}
+[data-theme=dark]{--wa-head:#202C33;--wa-bg:#0B141A;--wa-out:#005C4B;--wa-in:#202C33;--wa-text:#E9EDEF;--wa-time:#8696A0;--wa-bar:#202C33;--wa-field:#2A3942;--wa-doodle:rgba(233,237,239,.045)}
+.phone{border-radius:34px;padding:0;overflow:hidden;display:flex;flex-direction:column;height:552px;background:var(--wa-bg);border:6px solid var(--card)}
+[data-theme=dark] .phone{border-color:#1f1f23}
+.top{display:flex;align-items:center;gap:11px;padding:14px 16px;background:var(--wa-head);color:#fff}
+.back{font-size:26px;line-height:1;margin-right:-2px;opacity:.95}
+.av{width:38px;height:38px;border-radius:50%;background:#fff;display:grid;place-items:center;flex:none}
+.av .instinct{content:url(logo/instinct-black.png);height:22px}
+.who b{display:block;font-size:16.5px;font-weight:600}.who span{font-size:12.5px;opacity:.85}
+.icons{margin-left:auto;display:flex;gap:18px;opacity:.95}
+.icons svg{width:20px;height:20px}
+.chat{flex:1;padding:14px 14px 10px;display:flex;flex-direction:column;gap:7px;font-size:14.5px;line-height:1.36;color:var(--wa-text);
+ background-color:var(--wa-bg);
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round'%3E%3Ccircle cx='18' cy='20' r='7'/%3E%3Cpath d='M60 12l6 10h-12z'/%3E%3Cpath d='M95 18c4-6 12-6 14 0s-8 10-14 4'/%3E%3Crect x='14' y='62' width='14' height='10' rx='3'/%3E%3Cpath d='M52 66h16M60 58v16'/%3E%3Ccircle cx='100' cy='68' r='3'/%3E%3Cpath d='M20 104q8-10 16 0'/%3E%3Cpath d='M58 98l4 4 8-9'/%3E%3Cpath d='M92 100h18l-4 8h-10z'/%3E%3C/svg%3E");
+ background-size:120px 120px;background-blend-mode:normal}
+.chat{position:relative}
+.chat::before{content:"";position:absolute;inset:0;background:var(--wa-bg);opacity:.94;pointer-events:none}
+[data-theme=dark] .chat::before{opacity:.955}
+.chat>*{position:relative}
+.day{align-self:center;font-size:11.5px;color:var(--wa-time);background:var(--wa-in);border-radius:7px;padding:3px 9px;margin-bottom:2px}
+.b{max-width:84%;padding:6px 9px 5px;border-radius:9px;box-shadow:0 1px .5px rgba(11,20,26,.13);color:var(--wa-text)}
+.me{align-self:flex-end;background:var(--wa-out);border-top-right-radius:2px}
+.them{align-self:flex-start;background:var(--wa-in);border-top-left-radius:2px}
+.them ul{margin:4px 0 0 17px}.them li{margin:1px 0}
+.t{display:block;text-align:right;font-size:10.5px;color:var(--wa-time);margin-top:2px;font-family:Geist}
+.tick{color:var(--wa-tick);margin-left:3px;letter-spacing:-3px}
+.bar{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--wa-bar)}
+.field{flex:1;background:var(--wa-field);border-radius:20px;padding:9px 14px;font-size:14px;color:var(--wa-time)}
+.mic{width:38px;height:38px;border-radius:50%;background:var(--wa-green);display:grid;place-items:center}
+.mic svg{width:18px;height:18px}
+.side{padding-top:18px}.side h2{font-weight:900;font-size:44px;margin-top:16px}
+.steps{margin-top:34px;display:grid;gap:14px}
+.s{display:grid;grid-template-columns:44px 1fr;gap:16px;align-items:start}
+.n{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-family:GeistMono;font-weight:500;font-size:16px;color:var(--accent);border:1px solid var(--line);background:var(--card)}
+.s b{font-size:20px;font-weight:700;letter-spacing:-.01em}.s p{font-size:16px;color:var(--muted);margin-top:3px}
+.s code{font-family:GeistMono;font-size:14px;color:var(--accent)}
+</style></head><body><div class="glow"></div><div class="dots"></div>
+<div class="wrap">
+ <div class="phone">
+  <div class="top"><span class="back">‹</span><div class="av"><img class="instinct"></div><div class="who"><b>Instinct</b><span>online</span></div>
+   <div class="icons"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="13" height="12" rx="2.5"/><path d="M15.5 10.5l6-3.5v10l-6-3.5"/></svg><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg></div></div>
+  <div class="chat">
+   <div class="day">Today</div>
+   <div class="b me">Fix the signup form in example-org/app<span class="t">09:41<span class="tick">✓✓</span></span></div>
+   <div class="b them">On it. Claude is working on your server.<span class="t">09:41</span></div>
+   <div class="b them"><b>The signup form works again.</b><ul><li>Emails are checked before sending</li><li>All tests pass</li><li>Nothing pushed yet. Push it?</li></ul><span class="t">09:58</span></div>
+   <div class="b me">yes<span class="t">10:02<span class="tick">✓✓</span></span></div>
+   <div class="b them">Pushed to main as one commit.<span class="t">10:02</span></div>
+  </div>
+  <div class="bar"><div class="field">Message</div><div class="mic"><svg viewBox="0 0 24 24" fill="#fff"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M12 17v3" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg></div></div>
+ </div>
+ <div class="side"><div class="label">Example · Instinct on WhatsApp</div>
+  <h2>Text a task.<br><span class="accent">It ships when you say yes.</span></h2>
+  <div class="steps">
+   <div class="s"><div class="n">01</div><div><b>You write one sentence on WhatsApp</b><p>Which repo, what to change. No laptop, no terminal.</p></div></div>
+   <div class="s"><div class="n">02</div><div><b>Claude Code does it on your server</b><p>Instinct hands the task to FEMME; Claude changes the code and runs the tests.</p></div></div>
+   <div class="s"><div class="n">03</div><div><b>You get five lines, not a diff</b><p>What changed for you, what was checked, what needs your decision.</p></div></div>
+   <div class="s"><div class="n">04</div><div><b>Yes pushes, no throws it away</b><p>Until you answer, your repo is untouched.</p></div></div>
+  </div>
+ </div>
+</div></body></html>

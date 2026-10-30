@@ -1,0 +1,25 @@
+FEMME
+Copyright 2026 The FEMME contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+FEMME does not include third-party source code. Its scripts download and run
+these tools, each under its own license:
+
+- herdr (https://herdr.dev), Apache-2.0: the terminal and agent server FEMME is built around
+- Mutagen (https://mutagen.io): two-way folder sync
+- Caddy (https://caddyserver.com), Apache-2.0: HTTPS for the optional public board
+- ntfy (https://ntfy.sh), Apache-2.0 / GPL-2.0: phone notifications
+- mise (https://mise.jdx.dev), MIT: toolchains
+- claude-swap (https://github.com/realiti4/claude-swap), MIT: Claude account switching
+- xterm.js (https://xtermjs.org), MIT: the board's browser terminal, loaded from a CDN
+
+The board is built from Rust crates listed in board/Cargo.lock, under their own
+licenses (mostly MIT and/or Apache-2.0).
+
+Visuals (assets/):
+- The Exposure name, wordmark and mark (assets/src/logo/) are trademarks of
+  Exposure. They are not licensed under Apache-2.0; do not reuse them outside
+  this project without permission.
+- Geist and Geist Mono (assets/src/fonts/), Copyright (c) 2023 Vercel, in
+  collaboration with basement.studio, SIL Open Font License 1.1 (OFL.txt).

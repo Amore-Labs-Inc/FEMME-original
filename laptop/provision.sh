@@ -32,6 +32,10 @@ if [ "${BOARD_PUBLIC:-0}" = 1 ]; then  # public board (opt-in): Caddy needs 80 f
     'IpProtocol=tcp,FromPort=80,ToPort=80,IpRanges=[{CidrIp=0.0.0.0/0}]' \
     'IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null 2>&1 || true  # already open
 fi
+if [ "${MOSH:-0}" = 1 ]; then  # phone terminal (opt-in): mosh picks a UDP port in this range
+  aws ec2 authorize-security-group-ingress --group-id "$sg" --ip-permissions \
+    'IpProtocol=udp,FromPort=60000,ToPort=61000,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null 2>&1 || true  # already open
+fi
 
 # Optional instance role (AWS_ROLE=spawn): agents on the box may launch small instances in this region
 # and nothing else. Off by default: the box gets no AWS access. Policy rewritten every run.

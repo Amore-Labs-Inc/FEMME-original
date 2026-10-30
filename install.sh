@@ -77,6 +77,7 @@ else
   setenv BOARD_URL ""; setenv BOARD_PUBLIC 0; setenv ACCOUNT_ROTATION 0
 fi
 flag AUTODEPLOY "Should the server update itself when main changes on GitHub? (Anyone who can merge can then run code on it.)"
+[ "$where" = 3 ] || flag MOSH "A terminal on your phone too (Moshi or Blink, over mosh)?"
 [ "$where" != 1 ] || flag_aws=1
 if [ "${flag_aws:-}" = 1 ]; then
   if ask_yes "May agents on the server launch small AWS instances (AWS_ROLE=spawn)?" n; then setenv AWS_ROLE spawn; else setenv AWS_ROLE none; fi
@@ -128,6 +129,7 @@ EOF
 fi
 cat <<EOF
   3. This laptop (forking agents, drop box, its terminals on the board): ./laptop/laptop-setup.sh
-  4. Optional: notifications on your phone, the ntfy app subscribed to the NTFY_TOPIC in .env (docs/notifications.md).
+  4. Optional: notifications on your phone, the ntfy app subscribed to the NTFY_TOPIC in .env; a terminal
+     on the phone with MOSH=1 (both in docs/notifications.md).
      To hand FEMME tasks from a chat bot (e.g. Instinct on WhatsApp), see docs/api.md.
 EOF

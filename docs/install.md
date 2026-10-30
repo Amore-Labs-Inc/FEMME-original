@@ -3,7 +3,7 @@
 Everything starts on your laptop (Linux or macOS), from a checkout of this repo:
 
 ```sh
-git clone <this repo> femme && cd femme
+git clone https://github.com/Amore-Labs-Inc/femme && cd femme
 ./install.sh
 ```
 

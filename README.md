@@ -57,7 +57,7 @@ Any bot or agent can do the same with an API key: see [API](docs/api.md) and the
 On your laptop (Linux or macOS):
 
 ```sh
-git clone <this repo> femme && cd femme
+git clone https://github.com/Amore-Labs-Inc/femme && cd femme
 ./install.sh
 ```
 

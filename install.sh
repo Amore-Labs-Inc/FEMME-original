@@ -41,6 +41,8 @@ ask() {  # KEY "question" [secret] [check]: keeps the current value on Enter; as
       read -r -p "$2 [${cur}]: " v
     fi
     v=${v:-$cur}
+    # Option+Q is @ on Turkish and other layouts; with "Use Option as Meta key" the terminal sends Esc q.
+    v=${v//$'\x1b'q/@}
     [ -z "${4:-}" ] || "$4" "$v" || continue
     break
   done

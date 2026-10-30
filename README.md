@@ -102,7 +102,13 @@ Open a terminal on the board in that folder (Claude or Codex; both get the rule 
 
 Trust: the VPS's key logs in to your laptop as you, so anything running as your user on the VPS can run commands there (as it can already type into the laptop's terminals, above). The laptop's sshd is reachable only through the link the laptop itself opens.
 
-### iPhone
+### Use from a chat bot (API)
+
+You do not need a terminal on your phone. A chat bot you already talk to (on WhatsApp, say) can hand FEMME tasks through its API: make it a key on the board, give it `$BOARD_URL/api/openapi.json`, and it sends a task, reads Claude's short report and relays your yes or no (push or discard). If the bot runs on another machine, turn on the public board (`BOARD_PUBLIC=1`). Details: *API for other agents* below.
+
+### iPhone (optional)
+
+A terminal on the phone, for when you want to watch or type into the agents yourself.
 
 1. Install **Moshi** (or Blink Shell) and **ntfy**.
 2. In Moshi, generate a key and copy the public key. On the laptop: `ssh agentbox 'cat >> ~/.ssh/authorized_keys'`, paste, Ctrl-D.

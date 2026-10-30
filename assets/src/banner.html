@@ -1,26 +1,27 @@
 <!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
-:root{--w:1280px;--h:480px}
-.l{position:absolute;left:var(--edge);top:76px;width:470px}
-h1{font-size:104px}
-.sub{margin-top:26px;font-size:27px;font-weight:500;line-height:1.25;letter-spacing:-.01em;color:var(--text)}
+:root{--w:1280px;--h:460px}
+.wrap{position:relative;padding:72px 88px}
+h1{font-weight:900;font-size:112px;margin-top:18px}
+.sub{font-weight:500;font-size:28px;line-height:1.25;letter-spacing:-.01em;margin-top:22px;color:var(--text);max-width:520px}
 .sub b{font-weight:700;color:var(--accent)}
-.meta{margin-top:30px;font-family:GeistMono;font-size:13px;color:var(--muted);line-height:1.8}
-.board{position:absolute;right:var(--edge);top:76px;width:420px;padding:20px 22px}
-.board .cap{font-family:GeistMono;font-weight:500;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}
-.item{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:13px 0;border-top:1px solid var(--rule)}
-.item:first-of-type{border-top:0}
-.item b{font-size:16px;font-weight:600}
-.item span{font-size:13.5px;color:var(--muted);grid-column:1}
-.st{grid-row:1/3;grid-column:2;align-self:center;font-family:GeistMono;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border-radius:999px;background:var(--bg);color:var(--text)}
-.st.you{background:var(--accent);color:#fff}
-</style></head><body>
-<div class="l"><div class="kicker">Open source · by Exposure</div><h1>FEMME</h1>
-<div class="sub">Your coding agents keep working <b>after you close the laptop.</b></div>
-<div class="meta">Claude Code · Codex · Pi, on a server you own<br>Tasks from your terminal, a web board or WhatsApp</div></div>
-<div class="card board"><div class="cap"><span>On your server now</span><span>board</span></div>
- <div class="item" style="margin-top:8px"><b>Fix the signup form</b><span>from Instinct · report ready</span><div class="st you">needs your yes</div></div>
+[data-theme=dark] .sub b{color:#fff}
+.rule{margin-top:26px}
+.card{position:absolute;right:88px;top:64px;width:430px;padding:16px 20px 6px}
+.cap{display:flex;justify-content:space-between;font-family:GeistMono;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding-bottom:6px}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:11px 0;border-top:1px solid var(--line)}
+.item b{font-size:15.5px;font-weight:600;color:var(--fg)}
+.item span{font-size:13px;color:var(--muted);grid-column:1}
+.st{grid-row:1/3;grid-column:2;align-self:center;font-family:GeistMono;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:5px 9px;border-radius:999px;border:1px solid var(--line);color:var(--text)}
+.st.you{background:var(--accent);border-color:var(--accent);color:#fff}
+[data-theme=dark] .st.you{color:var(--ink)}
+.by{position:absolute;right:88px;bottom:44px;display:flex;align-items:center;gap:12px;font-size:20px;font-weight:500;color:var(--muted)}
+</style></head><body><div class="glow"></div><div class="dots"></div>
+<div class="wrap"><div class="label">Open source · Apache-2.0</div>
+<h1>FEMME</h1><div class="sub">Your coding agents keep working <b>after you close the laptop.</b></div><div class="rule"></div></div>
+<div class="card"><div class="cap"><span>On your server now</span><span>board</span></div>
+ <div class="item"><b>Fix the signup form</b><span>from Instinct · report ready</span><div class="st you">needs your yes</div></div>
  <div class="item"><b>#14 Add CSV export</b><span>Claude Code · 18 min</span><div class="st">working</div></div>
  <div class="item"><b>#12 Upgrade to Node 22</b><span>pull request opened</span><div class="st">PR ready</div></div>
- <div class="item"><b>refactor-auth</b><span>forked from your laptop</span><div class="st">working</div></div>
 </div>
+<div class="by">by <img class="wordmark"></div>
 </body></html>

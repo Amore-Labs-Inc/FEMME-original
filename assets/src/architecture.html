@@ -1,34 +1,40 @@
 <!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="theme.css"><script>const q=new URLSearchParams(location.search);document.documentElement.dataset.theme=q.get("theme")||"light"</script><style>
-:root{--w:1280px;--h:580px}
-.top{position:absolute;left:var(--edge);top:64px}
-h2{font-size:44px}
-.ins{position:absolute;left:var(--edge);top:212px;width:330px;display:grid;gap:12px}
+:root{--w:1280px;--h:560px}
+.wrap{position:relative;padding:56px 88px}
+h2{font-weight:900;font-size:44px;margin-top:12px}
+.grid{position:absolute;left:88px;right:88px;top:178px;bottom:56px;display:grid;grid-template-columns:330px 1fr 470px;align-items:center}
+.ins{display:grid;gap:14px}
 .in{padding:14px 18px;display:flex;gap:14px;align-items:center}
-.av{width:38px;height:38px;border-radius:50%;background:var(--bg);display:grid;place-items:center;flex:none;font-family:GeistMono;font-size:10px;letter-spacing:.04em;color:var(--accent);font-weight:500}.av .instinct{height:22px}
-.in b{display:block;font-size:16px;font-weight:700}.in span{font-size:13.5px;color:var(--muted)}
-svg{position:absolute;left:458px;top:212px;width:110px;height:324px}
-.srv{position:absolute;left:568px;right:var(--edge);top:212px;padding:24px 26px}
-.srv h3{font-size:24px;font-weight:900;letter-spacing:-.02em}
-.srv .note{font-size:14px;color:var(--muted);margin-top:4px}
-.row{display:grid;grid-template-columns:150px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--rule);font-size:14.5px}
-.note+.row{margin-top:18px}
-.row b{font-weight:600}.row span{color:var(--muted)}
-</style></head><body>
-<div class="top"><div class="kicker">How it fits together</div><h2>Everything talks to <span class="accent">one server you own</span></h2></div>
-<div class="ins">
- <div class="card in"><div class="av"><img class="instinct"></div><div><b>Instinct on WhatsApp</b><span>sends tasks over the API</span></div></div>
- <div class="card in"><div class="av">SSH</div><div><b>Your laptop</b><span>moves agents, syncs folders</span></div></div>
- <div class="card in"><div class="av">WEB</div><div><b>Browser</b><span>the board: queue and live terminals</span></div></div>
- <div class="card in"><div class="av">MOSH</div><div><b>Phone, optional</b><span>a terminal and notifications</span></div></div>
-</div>
-<svg viewBox="0 0 110 324" fill="none" stroke-width="1.5" style="stroke:var(--accent)">
- <path d="M0 33 C60 33 50 162 110 162"/><path d="M0 115 C60 115 50 162 110 162"/>
- <path d="M0 209 C60 209 50 162 110 162"/><path d="M0 291 C60 291 50 162 110 162"/>
-</svg>
-<div class="card srv"><div class="kicker">Your server · Ubuntu 24.04</div><h3 style="margin-top:10px">FEMME on herdr</h3><div class="note">Nothing is open to the internet unless you turn it on.</div>
- <div class="row"><b>Agents</b><span>Claude Code, Codex, Pi, each in its own terminal, running day and night</span></div>
- <div class="row"><b>Board &amp; API</b><span>the issue queue, live terminals, and the API Instinct calls</span></div>
- <div class="row"><b>Worker</b><span>turns issues into branches and pull requests</span></div>
- <div class="row"><b>Notifications</b><span>a push when an agent is waiting for you or done</span></div>
-</div>
-</body></html>
+.ic{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-family:GeistMono;font-size:10.5px;font-weight:500;color:var(--accent);border:1px solid var(--line)}
+.in b{display:block;font-size:17px;font-weight:700}.in span{font-size:13.5px;color:var(--muted);font-family:GeistMono}
+.ic.iav{border:1px solid var(--line)}
+svg{width:100%;height:100%}
+.srv{padding:26px 28px}
+.srv .label{font-size:13px}
+.srv h3{font-size:26px;font-weight:900;letter-spacing:-.02em;margin:8px 0 18px}
+.box{border:1px dashed var(--line);border-radius:14px;padding:14px 16px;margin-top:12px}
+.box b{font-size:16px;font-weight:700}.box p{font-size:14px;color:var(--muted);margin-top:4px}
+.pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pill{font-family:GeistMono;font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--text)}
+.pill.on{color:#fff;background:var(--blue);border-color:var(--blue)}
+[data-theme=dark] .pill.on{background:var(--bright);border-color:var(--bright);color:var(--ink)}
+</style></head><body><div class="glow"></div><div class="dots"></div>
+<div class="wrap"><div class="label">How it fits together</div><h2>Everything talks to <span class="accent">one server you own.</span></h2></div>
+<div class="grid">
+ <div class="ins">
+  <div class="card in"><div class="ic iav"><img class="instinct" style="height:22px"></div><div><b>Instinct on WhatsApp</b><span>sends tasks over the API</span></div></div>
+  <div class="card in"><div class="ic">SSH</div><div><b>Your laptop</b><span>moves agents, syncs folders</span></div></div>
+  <div class="card in"><div class="ic">WEB</div><div><b>Browser</b><span>the queue and live terminals</span></div></div>
+  <div class="card in"><div class="ic">MOSH</div><div><b>Phone, optional</b><span>a terminal and notifications</span></div></div>
+ </div>
+ <svg viewBox="0 0 200 360" preserveAspectRatio="none" fill="none" stroke-width="2">
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" style="stop-color:var(--line)"/><stop offset="1" style="stop-color:var(--accent)"/></linearGradient></defs>
+  <path d="M0 45 C100 45 100 180 200 180" stroke="url(#g)"/><path d="M0 135 C100 135 100 180 200 180" stroke="url(#g)"/>
+  <path d="M0 225 C100 225 100 180 200 180" stroke="url(#g)"/><path d="M0 315 C100 315 100 180 200 180" stroke="url(#g)"/>
+ </svg>
+ <div class="card srv"><div class="label">your server · ubuntu 24.04</div><h3>herdr, always on</h3>
+  <div class="pills"><span class="pill on">Claude Code</span><span class="pill">Codex</span><span class="pill">Pi</span></div>
+  <div class="box"><b>Board &amp; API</b><p>the issue queue, live terminals, and the API Instinct calls</p></div>
+  <div class="box"><b>Worker &amp; notifications</b><p>issues become pull requests · a push when an agent needs you</p></div>
+ </div>
+</div></body></html>

@@ -66,7 +66,13 @@ is_emails() {  # comma-separated; also catches keyboard escapes (Option+Q for @ 
 is_admin() {  # user@address, and this laptop's key logs in there
   case $1 in *@?*) ;; *) warn "  as user@address, e.g. ubuntu@203.0.113.7"; return 1 ;; esac
   case ${1#*@} in 203.0.113.*) warn "  that is the example address: use your server's"; return 1 ;; esac
-  ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "$1" true 2>/dev/null && return
+  local err
+  printf '  checking %s over ssh…\n' "$1" >&2
+  err=$(ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "$1" true 2>&1 | tr -d '\r' | tail -n 1; exit "${PIPESTATUS[0]}") && return
+  case $err in
+    *"Permission denied"*) ;;
+    *) warn "  could not reach ${1#*@} over ssh (${err##*: }): check the address"; return 1 ;;
+  esac
   # Many VPSs start with a password: put the key there once, so every later step logs in without one.
   warn "  ~/.ssh/id_ed25519 does not log in to $1 yet; if it takes a password, enter it once to add the key"
   ssh-copy-id -i ~/.ssh/id_ed25519.pub -o ConnectTimeout=10 "$1" >/dev/null 2>&1 </dev/tty \

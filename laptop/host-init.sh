@@ -15,12 +15,15 @@ pub=~/.ssh/id_ed25519.pub
 [ -f "$pub" ] || die "no $pub: make one with ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519"
 
 say "checking $server"
+ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "$admin" true \
+  || die "could not log in to $admin over ssh: check the address, and that this laptop's key is on that account"
 ssh -o ConnectTimeout=10 "$admin" 'grep -q "^VERSION_ID=\"24.04\"" /etc/os-release && case $(uname -m) in x86_64|aarch64) ;; *) exit 1 ;; esac' \
   || die "$server must run Ubuntu 24.04 on x86_64 or arm64 (aarch64)"
 
 say "preparing $server for user $USER"
-# The script goes over stdin; user, key and host name as arguments.
-ssh "$admin" sudo bash -s -- "$USER" "$(cat "$pub")" "$HOST" <<'REMOTE'
+# The script goes over stdin; user, key and host name as arguments, quoted: ssh joins them into one
+# command line, and the key has spaces in it.
+ssh "$admin" "sudo bash -s -- $(printf '%q ' "$USER" "$(cat "$pub")" "$HOST")" <<'REMOTE'
 set -euo pipefail
 user=$1 key=$2 host=$3
 export DEBIAN_FRONTEND=noninteractive

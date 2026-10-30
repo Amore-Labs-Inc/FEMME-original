@@ -1457,7 +1457,7 @@ mod tests {
 
     #[test]
     fn repo_validation_blocks_shell_and_path_tricks() {
-        assert!(valid_repo("Darkosxl/FEMME"));
+        assert!(valid_repo("Amore-Labs-Inc/FEMME-original"));
         assert!(valid_repo("a-b/c_d.e"));
         for bad in ["", "x", "a/b/c", "../x", "a/..", "a/.git", "a b/c", "a/$(rm)", "a/b;c", "-o/x", "a/--upload-pack"] {
             assert!(!valid_repo(bad), "{bad} should be rejected");

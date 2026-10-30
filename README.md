@@ -28,7 +28,7 @@ Defaults live in `.env` (`REGION`, `INSTANCE_TYPE`, `DISK_GB`, `HOST`, `SPAWN_TY
 
 ```sh
 herdr machine add agentbox --label agentbox --remote-session default
-herdr plugin link "$PWD"                    # or: herdr plugin install Darkosxl/FEMME --yes
+herdr plugin link "$PWD"                    # or: herdr plugin install Amore-Labs-Inc/FEMME-original --yes
 cp systemd/mutagen.service ~/.config/systemd/user/ && systemctl --user enable --now mutagen
 cp systemd/femme-link.service ~/.config/systemd/user/ && systemctl --user enable --now femme-link  # laptop terminals on the board
 ```

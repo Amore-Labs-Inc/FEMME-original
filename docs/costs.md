@@ -1,7 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-costs-dark.png">
-  <img alt="FEMME docs: Costs" src="../assets/docs-costs-light.png" width="100%">
-</picture>
+# Costs
 
 FEMME itself is free. What you pay for, and what is optional:
 

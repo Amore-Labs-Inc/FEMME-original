@@ -1,7 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-aws-dark.png">
-  <img alt="FEMME docs: AWS" src="../assets/docs-aws-light.png" width="100%">
-</picture>
+# AWS
 
 ## The server's own AWS access
 

@@ -1,7 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-laptop-dark.png">
-  <img alt="FEMME docs: Laptop" src="../assets/docs-laptop-light.png" width="100%">
-</picture>
+# Laptop: fork agents, sync folders, drop box, pc
 
 Optional. The server works on its own; this is for moving agents between your laptop and the server.
 

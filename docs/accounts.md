@@ -1,7 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-accounts-dark.png">
-  <img alt="FEMME docs: Claude accounts" src="../assets/docs-accounts-light.png" width="100%">
-</picture>
+# Claude accounts
 
 The board's **accounts** page (the ⋯ button) lists every Claude account stored with [cswap](https://pypi.org/project/claude-swap/), with each account's 5-hour and 7-day usage.
 

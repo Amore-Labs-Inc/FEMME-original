@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
-  <img alt="FEMME: your coding agents, always on. By Exposure." src="assets/banner-light.png" width="100%">
+  <img alt="FEMME by Exposure: keeps Claude Code, Codex and Pi running under herdr on your own Ubuntu server. Example: a bot sends a task with POST /api/agents/instinct, reads the message, then pushes." src="assets/banner-light.png" width="100%">
 </picture>
 
 <p align="center">
@@ -10,8 +10,7 @@
   <img alt="Agents: Claude Code, Codex, Pi" src="https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Pi-7C3AED?style=flat-square">
 </p>
 
-<p align="center"><b>Always-on <a href="https://herdr.dev">herdr</a> on your own Linux server.</b><br>
-Start coding agents from your laptop, your phone or a chat bot. Close the lid, come back later:<br>they kept running on the server, and you find them where they ended up.</p>
+FEMME runs coding agents (Claude Code, Codex, Pi) under [herdr](https://herdr.dev) on a server you own, so they keep working while your laptop sleeps. You reach them over SSH, in a web board, or through an HTTP API that bots like Instinct use. It is a set of shell scripts, systemd user services and one small Rust server; nothing is exposed to the internet unless you turn it on.
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
@@ -20,27 +19,22 @@ Start coding agents from your laptop, your phone or a chat bot. Close the lid, c
   <a href="#docs">Docs</a>
 </p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/features-dark.png">
-  <img alt="Always on: herdr starts at boot and agents resume after a reboot. Fork to the server: one key moves a local agent and its folder onto the server. Tasks from a chat: a bot like Instinct hands tasks over the API. A board for the queue: issues become pull requests, live terminals in the browser." src="assets/features-light.png" width="100%">
-</picture>
-
 ## Example: Instinct on WhatsApp
 
 We run FEMME this way. We write to [Instinct](https://instinct.com/) on WhatsApp: "fix the signup form in our repo". Instinct hands the task to FEMME through its API. Claude Code does the work on the server, checks it and writes a short report in plain words. Instinct sends us the report, and nothing is pushed until we answer "yes". No laptop and no terminal needed.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/instinct-dark.png">
-  <img alt="A WhatsApp chat with Instinct: you ask it to fix the signup form, Instinct reports Claude is working on the server, then sends a short report, you answer yes, and it pushes to main." src="assets/instinct-light.png" width="100%">
+  <img alt="Left, a WhatsApp chat with Instinct: fix the signup form, Claude is on it, a short report, yes. Right, the FEMME API call behind each message: POST /api/agents/instinct, GET while it works, GET with the report, POST /push." src="assets/instinct-light.png" width="100%">
 </picture>
 
 Any bot or agent can do the same with an API key: see [API](docs/api.md) and the [minimal client](examples/api-client.sh).
 
-## How it fits together
+## What runs where
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/architecture-dark.png">
-  <img alt="Instinct on WhatsApp, your laptop, the browser and an optional phone all connect to one server you own, running herdr with Claude Code, Codex or Pi, the board and API, the worker and notifications." src="assets/architecture-light.png" width="100%">
+  <img alt="What runs where. Clients: Instinct or any bot over HTTPS, the laptop over ssh and Mutagen, the browser over an ssh tunnel, an optional phone over mosh. Server, systemd user services: herdr-server, herdr-instinct, femme-board on 127.0.0.1:8787, femme-worker, herdr-notify; optional caddy and femme-cswap." src="assets/architecture-light.png" width="100%">
 </picture>
 
 - **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
@@ -52,7 +46,7 @@ Any bot or agent can do the same with an API key: see [API](docs/api.md) and the
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/install-dark.png">
-  <img alt="Install in three steps: run ./install.sh (automatic), sign in on the server once (you), check with ./doctor.sh (automatic)." src="assets/install-light.png" width="100%">
+  <img alt="./install.sh output: five steps and its questions; ./doctor.sh output with ok lines and one fix: Claude Code is not signed in on the server, ssh agentbox, run claude, then /login." src="assets/install-light.png" width="100%">
 </picture>
 
 On your laptop (Linux or macOS):
@@ -96,6 +90,6 @@ Agents on the server run without permission prompts, and anything running as you
 Apache-2.0, see [LICENSE](LICENSE). FEMME builds on [herdr](https://herdr.dev) and other tools it installs but does not include; see [NOTICE](NOTICE). The Exposure name and logos are trademarks of Exposure and are not covered by the license.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/footer-dark.png">
-  <img alt="FEMME, Apache-2.0, by Exposure" src="assets/footer-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset="assets/endcard-dark.png">
+  <img alt="exposure. FEMME is built and open-sourced by Exposure, Apache-2.0." src="assets/endcard-light.png" width="100%">
 </picture>

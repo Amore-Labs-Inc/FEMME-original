@@ -14,26 +14,12 @@ shot() {  # page width height name [query]
   done
   echo "$4"
 }
-shot banner.html 1280 420 banner
+shot banner.html 1280 480 banner
 shot instinct.html 1280 640 instinct
-shot architecture.html 1280 560 architecture
-shot install.html 1280 420 install
-shot features.html 1280 520 features
-shot footer.html 1280 200 footer
+shot architecture.html 1280 620 architecture
+shot install.html 1280 640 install
+shot endcard.html 1280 360 endcard
 # GitHub's social preview (repo Settings → Social preview): one image, dark.
 "$chrome" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=1280,640 \
   --virtual-time-budget=2000 --screenshot="$out/social-preview.png" "file://$PWD/social.html?theme=dark" >/dev/null 2>&1
 echo social-preview
-while IFS='|' read -r name title kicker; do
-  shot docheader.html 1280 220 "docs-$name" "title=$(printf %s "$title" | sed 's/ /%20/g; s/&/%26/g')&kicker=$kicker"
-done <<'LIST'
-install|Install|guide
-laptop|Laptop|guide
-api|API & Instinct|guide
-board|The board|guide
-phone|Phone|optional
-accounts|Claude accounts|guide
-aws|AWS|optional
-troubleshooting|Troubleshooting|help
-costs|Costs|guide
-LIST

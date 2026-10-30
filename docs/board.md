@@ -1,7 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="../assets/docs-board-dark.png">
-  <img alt="FEMME docs: The board" src="../assets/docs-board-light.png" width="100%">
-</picture>
+# Board: issues, terminals, sessions
 
 Set `BOARD_EMAIL` and `BOARD_URL` in `.env` and run `./sync.sh`.
 

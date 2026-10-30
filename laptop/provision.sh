@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Create the VPS on AWS (default VPC). Safe to rerun: reuses everything tagged femme.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 [ -f .env ] || cp .env.example .env
 . ./.env
-. ./lib.sh
+. ./laptop/lib.sh
 aws() { command aws --region "$REGION" --output text "$@"; }
 tag() { echo "ResourceType=$1,Tags=[{Key=Name,Value=femme}]"; }
 retry() {  # rerun while EC2 has not yet heard of the new instance profile (takes a few seconds)
@@ -59,7 +59,7 @@ if [ "$id" = None ]; then
     --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id)
   userdata=$(mktemp)
   trap 'rm -f "$userdata"' EXIT
-  sed -e "s|__USER__|$USER|g" -e "s|__HOST__|$HOST|g" -e "s|__PUBKEY__|$(cat ~/.ssh/id_ed25519.pub)|" cloud-init.yaml > "$userdata"
+  sed -e "s|__USER__|$USER|g" -e "s|__HOST__|$HOST|g" -e "s|__PUBKEY__|$(cat ~/.ssh/id_ed25519.pub)|" laptop/cloud-init.yaml > "$userdata"
   id=$(retry aws ec2 run-instances --image-id "$ami" --instance-type "$INSTANCE_TYPE" \
     --security-group-ids "$sg" --user-data "file://$userdata" ${profile[@]+"${profile[@]}"} \
     --block-device-mappings "DeviceName=/dev/sda1,Ebs={VolumeSize=$DISK_GB,VolumeType=gp3}" \
@@ -82,4 +82,4 @@ aws ec2 associate-address --instance-id "$id" --allocation-id "$alloc" >/dev/nul
 setenv IP "$ip"
 
 ssh_config_block "$HOST" "$ip" "$USER"
-echo "$HOST is $ip ($id). Next: ssh $HOST cloud-init status --wait && ./sync.sh"
+echo "$HOST is $ip ($id). Next: ssh $HOST cloud-init status --wait && ./laptop/sync.sh"

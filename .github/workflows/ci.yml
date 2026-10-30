@@ -17,9 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: syntax
-        run: for f in *.sh; do bash -n "$f"; done
+        run: for f in *.sh laptop/*.sh server/*.sh plugin/*.sh examples/*.sh assets/src/*.sh; do bash -n "$f"; done
       - name: shellcheck (errors only)
-        run: shellcheck -S error *.sh
+        run: shellcheck -S error *.sh laptop/*.sh server/*.sh plugin/*.sh examples/*.sh assets/src/*.sh
 
   secrets:
     runs-on: ubuntu-24.04

@@ -4,7 +4,7 @@ After=femme-board.service herdr-server.service
 
 [Service]
 Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=%h/femme/worker.sh
+ExecStart=%h/femme/server/worker.sh
 Restart=always
 RestartSec=30
 

@@ -6,15 +6,15 @@ Start with `./doctor.sh`: it checks the laptop, the server, the services, the si
 
 | You see | Why | Do |
 |---|---|---|
-| `doctor.sh`: herdr versions differ | the server runs the laptop's herdr version, and the laptop updated | `./sync.sh` |
+| `doctor.sh`: herdr versions differ | the server runs the laptop's herdr version, and the laptop updated | `./laptop/sync.sh` |
 | Claude in a server terminal asks you to log in | the server has no Claude login yet, or it expired | `ssh <alias>`, run `claude`, then `/login` |
 | Board card: `could not clone owner/repo` | the server's GitHub CLI is not signed in, or has no access to that repo | `ssh <alias> 'gh auth login && gh auth setup-git'` |
-| No sign-in email | no `RESEND_API_KEY`, or `MAIL_FROM` is not a sender your Resend domain allows | the link is in `journalctl --user -u femme-board -n 20` on the server; fix `.env`, then `./sync.sh` |
+| No sign-in email | no `RESEND_API_KEY`, or `MAIL_FROM` is not a sender your Resend domain allows | the link is in `journalctl --user -u femme-board -n 20` on the server; fix `.env`, then `./laptop/sync.sh` |
 | `this link has expired or was already used` | sign-in links work once, for 15 minutes | ask for a new one (one a minute) |
-| `femme-board` restarts over and over | `BOARD_EMAIL` or `BOARD_URL` is empty | set both in `.env`, then `./sync.sh` |
-| Public board: no HTTPS, certificate errors | the DNS A record does not point at the server yet, a proxy sits in front, or ports 80/443 are closed | fix the record (DNS only), open the ports, then `./sync.sh` |
-| `laptop not linked` (drop box, `pc`) | the laptop is asleep, or `femme-link` is not running | wake it; `./laptop-setup.sh` once; on Linux `systemctl --user status femme-link`, on macOS `~/Library/Logs/femme-link.log` |
-| `pc: ... is not shared from the laptop` | that folder is not in sync | on the laptop: `sh sync-dir.sh <folder>` |
+| `femme-board` restarts over and over | `BOARD_EMAIL` or `BOARD_URL` is empty | set both in `.env`, then `./laptop/sync.sh` |
+| Public board: no HTTPS, certificate errors | the DNS A record does not point at the server yet, a proxy sits in front, or ports 80/443 are closed | fix the record (DNS only), open the ports, then `./laptop/sync.sh` |
+| `laptop not linked` (drop box, `pc`) | the laptop is asleep, or `femme-link` is not running | wake it; `./laptop/laptop-setup.sh` once; on Linux `systemctl --user status femme-link`, on macOS `~/Library/Logs/femme-link.log` |
+| `pc: ... is not shared from the laptop` | that folder is not in sync | on the laptop: `sh laptop/sync-dir.sh <folder>` |
 | A file shows a conflict, neither side changes | both sides edited it; Mutagen pauses it instead of overwriting | `mutagen sync list`, keep the right copy, delete the other |
 | Agents pause with `paused at N% of the 5-hour window` | the worker leaves the rest of the window to you (`CAP` in `.env`) | wait for the reset, raise `CAP`, or turn on account rotation |
 | `./install.sh`: `must run Ubuntu 24.04 on x86_64 or arm64` | another OS or release | use Ubuntu 24.04 |

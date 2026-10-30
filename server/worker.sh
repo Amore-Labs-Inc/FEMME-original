@@ -4,7 +4,7 @@
 # passes $CAP percent, running agents are interrupted and wait for the reset, so the rest of the
 # window stays yours; after the reset they continue where they stopped.
 set -u
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 . ./.env
 CAP=${CAP:-60}
 PARALLEL=${PARALLEL:-2}

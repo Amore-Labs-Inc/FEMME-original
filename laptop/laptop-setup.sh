@@ -3,14 +3,14 @@
 # the femme plugin with its two keys, and the background services: Mutagen (folder sync) and
 # femme-link (this laptop's terminals on the board). Needs herdr; Mutagen is optional. Safe to rerun.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 . ./.env
-. ./lib.sh
+. ./laptop/lib.sh
 command -v herdr >/dev/null || die "laptop-setup: install herdr first (https://herdr.dev); without it, the board and the API still work"
 
 say "herdr: $HOST as a machine, femme as a plugin"
 herdr machine add "$HOST" --label "$HOST" --remote-session default >/dev/null 2>&1 || true
-herdr plugin link "$PWD" >/dev/null 2>&1 || true
+herdr plugin link "$PWD/plugin" >/dev/null 2>&1 || true
 cfg=~/.config/herdr/config.toml
 mkdir -p "${cfg%/*}"
 grep -q 'femme.fork-remote' "$cfg" 2>/dev/null || cat >> "$cfg" <<'EOF'
@@ -36,7 +36,7 @@ case $(uname -s) in
     mkdir -p ~/.config/systemd/user
     units=femme-link
     if command -v mutagen >/dev/null; then units="mutagen $units"; else warn "no mutagen: forking agents and folder sync stay off"; fi
-    for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
+    for u in $units; do cp "laptop/systemd/$u.service" ~/.config/systemd/user/; done
     # The unit dials "agentbox": point it at your alias.
     sed -i "s/ agentbox\$/ $HOST/" ~/.config/systemd/user/femme-link.service
     systemctl --user daemon-reload
@@ -46,7 +46,7 @@ case $(uname -s) in
     # Mutagen keeps its own daemon in launchd.
     if command -v mutagen >/dev/null; then mutagen daemon register && mutagen daemon start || true
     else warn "no mutagen: forking agents and folder sync stay off"; fi
-    # femme-link as a launchd agent: the same ssh as systemd/femme-link.service. The server maps /Users to
+    # femme-link as a launchd agent: the same ssh as laptop/systemd/femme-link.service. The server maps /Users to
     # /home (bootstrap.sh), so this laptop's paths work there.
     name=$(hostname -s)
     plist=~/Library/LaunchAgents/dev.femme.link.plist

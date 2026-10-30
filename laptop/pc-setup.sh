@@ -4,11 +4,11 @@
 # through the link this machine opens (femme-link.service), so nothing is exposed to the
 # network. Safe to rerun.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 . ./.env
 
 command -v mutagen >/dev/null && systemctl --user is-enabled -q mutagen \
-  || { echo "pc-setup: install mutagen and enable mutagen.service first (./laptop-setup.sh)" >&2; exit 1; }
+  || { echo "pc-setup: install mutagen and enable mutagen.service first (./laptop/laptop-setup.sh)" >&2; exit 1; }
 
 [ "$(uname -s)" = Linux ] || { echo "pc-setup: pc needs a Linux laptop for now" >&2; exit 1; }
 if command -v pacman >/dev/null; then sudo pacman -S --needed --noconfirm openssh
@@ -25,18 +25,18 @@ sudo systemctl enable --now $svc
 sudo systemctl reload $svc
 
 # The VPS's own key (bootstrap.sh makes it) may log in here.
-key=$(ssh "$HOST" cat .ssh/id_ed25519.pub) || { echo "pc-setup: the VPS has no key yet: ./sync.sh first" >&2; exit 1; }
+key=$(ssh "$HOST" cat .ssh/id_ed25519.pub) || { echo "pc-setup: the VPS has no key yet: ./laptop/sync.sh first" >&2; exit 1; }
 mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
 grep -qxF "$key" ~/.ssh/authorized_keys || echo "$key" >> ~/.ssh/authorized_keys
 
 # The link now also forwards this sshd; the VPS names "Host pc" after the linked laptop.
 mkdir -p ~/.config/systemd/user
-cp systemd/femme-link.service ~/.config/systemd/user/
+cp laptop/systemd/femme-link.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now femme-link
 systemctl --user restart femme-link
 ssh "$HOST" 'grep -q "^Host pc$" ~/.ssh/config 2>/dev/null' \
-  || ssh "$HOST" "cd femme && HERDR_VERSION=$(herdr --version | cut -d' ' -f2) ./bootstrap.sh" >/dev/null
+  || ssh "$HOST" "cd femme && HERDR_VERSION=$(herdr --version | cut -d' ' -f2) ./server/bootstrap.sh" >/dev/null
 
 echo "pc-setup: checking from the VPS..."
 for _ in 1 2 3 4 5 6; do

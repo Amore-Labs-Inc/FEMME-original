@@ -1,7 +1,7 @@
 #!/bin/sh
 # Fork the focused local agent onto the VPS and keep the local one running.
 # Puts the agent's folder (git repo root, or cwd) in live two-way sync with the
-# same path on the VPS (sync-dir.sh), copies the session file, then starts the
+# same path on the VPS (laptop/sync-dir.sh), copies the session file, then starts the
 # agent there in its own fork mode, like forkr does locally.
 #
 # Usage: fork-remote.sh [pane-id]     Host: $FEMME_HOST (default agentbox)
@@ -51,7 +51,7 @@ root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || root=$cwd
 case $root in
   "$HOME"/?*)
     notify "Syncing $root with $host"
-    sh "${HERDR_PLUGIN_ROOT:-$(dirname "$0")}/sync-dir.sh" "$root" >/dev/null 2>&1 \
+    sh "${HERDR_PLUGIN_ROOT:-$(dirname "$0")}/../laptop/sync-dir.sh" "$root" >/dev/null 2>&1 \
       || fail "could not sync $root with $host" ;;
   *) ssh "$host" mkdir -p "$(printf %q "$cwd")" ;;  # never ship /tmp or all of $HOME
 esac

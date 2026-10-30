@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs on the VPS (sync.sh copies this repo to ~/femme first). Safe to rerun.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 . ./.env
 export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
 
@@ -41,10 +41,10 @@ for a in claude codex pi opencode; do herdr integration install "$a" || echo "WA
 grep -q '^\[experimental\]' ~/.config/herdr/config.toml 2>/dev/null \
   || printf '\n[experimental]\n# single-user box: keep screen history across reboots\npane_history = true\n' >> ~/.config/herdr/config.toml
 
-# Linked laptops (systemd/femme-link.service) forward their herdr socket into ~/.config/herdr/remote
+# Linked laptops (laptop/systemd/femme-link.service) forward their herdr socket into ~/.config/herdr/remote
 # for the board. sshd replaces a stale socket on reconnect and drops a dead link (lid shut) in ~45 s.
 mkdir -p ~/.config/herdr/remote
-# Instinct's terminals run in a herdr session of their own (systemd/herdr-instinct.service), so a
+# Instinct's terminals run in a herdr session of their own (server/systemd/herdr-instinct.service), so a
 # laptop can list them as a machine tab of their own; the board lists them the same way as a
 # laptop's, tagged instinct, through this link.
 ln -sfn ~/.config/herdr/sessions/instinct/herdr.sock ~/.config/herdr/remote/instinct.sock
@@ -62,11 +62,11 @@ case $pc_host in
        printf '# femme pc start\nHost pc\n  ProxyCommand nc -U %s/.config/herdr/remote/%s.ssh\n  User %s\n  IdentityFile ~/.ssh/id_ed25519\n  IdentitiesOnly yes\n  ControlMaster auto\n  ControlPath ~/.ssh/cm-pc\n  ControlPersist 10m\n  ServerAliveInterval 15\n  ServerAliveCountMax 2\n  ConnectTimeout 5\n  StrictHostKeyChecking accept-new\n# femme pc end\n' "$HOME" "$pc_host" "$(id -un)"
      } > ~/.ssh/config.new && mv ~/.ssh/config.new ~/.ssh/config && chmod 600 ~/.ssh/config ;;
 esac
-install -m755 pc.sh ~/.local/bin/pc
+install -m755 server/pc.sh ~/.local/bin/pc
 # The same rule for every agent: Claude reads ~/.claude/rules, Codex its global ~/.codex/AGENTS.md.
-mkdir -p ~/.claude/rules && cp rules/pc.md ~/.claude/rules/femme-pc.md
+mkdir -p ~/.claude/rules && cp server/rules/pc.md ~/.claude/rules/femme-pc.md
 { [ -f ~/.codex/AGENTS.md ] && sed '/^<!-- femme pc start -->$/,/^<!-- femme pc end -->$/d' ~/.codex/AGENTS.md
-  printf '<!-- femme pc start -->\n'; cat rules/pc.md; printf '<!-- femme pc end -->\n'
+  printf '<!-- femme pc start -->\n'; cat server/rules/pc.md; printf '<!-- femme pc end -->\n'
 } > ~/.codex/AGENTS.new && mv ~/.codex/AGENTS.new ~/.codex/AGENTS.md
 
 units="herdr-server herdr-instinct herdr-notify"
@@ -124,17 +124,17 @@ if [ -n "${BOARD_URL:-}" ]; then
 fi
 
 mkdir -p ~/.config/systemd/user
-for u in $units; do cp "systemd/$u.service" ~/.config/systemd/user/; done
+for u in $units; do cp "server/systemd/$u.service" ~/.config/systemd/user/; done
 # Only the timer is started here: deploy.sh runs this script, and starting its own service would wait on itself.
 # Optional (AUTODEPLOY=1): anyone who can merge to main can then run code on this box.
-[ "${AUTODEPLOY:-0}" != 1 ] || { cp systemd/femme-deploy.service systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
+[ "${AUTODEPLOY:-0}" != 1 ] || { cp server/systemd/femme-deploy.service server/systemd/femme-deploy.timer ~/.config/systemd/user/; units="$units femme-deploy.timer"; }
 systemctl --user daemon-reload
 systemctl --user enable --now $units
 # The plugin runs from this checkout (deploy.sh keeps it at main). sync.sh just copied the laptop's
 # plugins.json over ours, which points femme at the laptop's checkout path: relink when it differs.
-if [ "$(herdr plugin list --json 2>/dev/null | jq -r '.result.plugins[] | select(.plugin_id == "femme") | .plugin_root')" != "$PWD" ]; then
+if [ "$(herdr plugin list --json 2>/dev/null | jq -r '.result.plugins[] | select(.plugin_id == "femme") | .plugin_root')" != "$PWD/plugin" ]; then
   herdr plugin unlink femme >/dev/null 2>&1 || true
-  herdr plugin link "$PWD" >/dev/null || echo "WARN: could not link the femme plugin from $PWD" >&2
+  herdr plugin link "$PWD/plugin" >/dev/null || echo "WARN: could not link the femme plugin from $PWD/plugin" >&2
 fi
 systemctl --user restart $(printf '%s\n' $units | grep -vE '^(herdr-server|herdr-instinct|femme-deploy.timer)$')
 herdr server reload-config >/dev/null 2>&1 || true

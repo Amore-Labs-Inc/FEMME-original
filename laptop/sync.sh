@@ -3,7 +3,7 @@
 # Project folders sync on demand, when you fork into them (sync-dir.sh).
 # Never copies credentials: log in on the VPS once (see README).
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 . ./.env
 r() { rsync -az --mkpath "$@"; }
 
@@ -25,4 +25,4 @@ jq --arg mcp "${CLAUDE_MCP:-}" '{theme, hasCompletedOnboarding, lastOnboardingVe
 # The VPS runs the laptop's herdr version (the laptop's client talks to it); without herdr here, the one in .env.
 v=$(herdr --version 2>/dev/null | cut -d' ' -f2) || v=
 v=${v:-${HERDR_VERSION:?herdr is not installed here: set HERDR_VERSION in .env}}
-ssh "$HOST" "HERDR_VERSION=$v ~/femme/bootstrap.sh"
+ssh "$HOST" "HERDR_VERSION=$v ~/femme/server/bootstrap.sh"

@@ -3,10 +3,10 @@
 Optional. The server works on its own; this is for moving agents between your laptop and the server.
 
 ```sh
-./laptop-setup.sh
+./laptop/laptop-setup.sh
 ```
 
-On Linux (systemd) or macOS (launchd): adds the server as a herdr machine, links this checkout as the `femme` plugin, adds its two keys to `~/.config/herdr/config.toml`, and starts Mutagen and `femme-link` (this laptop's terminals on the board). Needs herdr; Mutagen only for forking and sync. macOS support is new: report what does not work. Run `./sync.sh` afterwards so the server gets the keys too.
+On Linux (systemd) or macOS (launchd): adds the server as a herdr machine, links `plugin/` as the `femme` plugin, adds its two keys to `~/.config/herdr/config.toml`, and starts Mutagen and `femme-link` (this laptop's terminals on the board). Needs herdr; Mutagen only for forking and sync. macOS support is new: report what does not work. Run `./laptop/sync.sh` afterwards so the server gets the keys too.
 
 The keys it adds are below. A `[[keys.command]]` binding belongs to the machine selected in herdr, not to the client: the fork key is used on Local panes, so the laptop's own copy serves it (`herdr server reload-config` is enough), but the drop box key is pressed on agentbox panes, so it must be in the VPS's `config.toml` too, which `sync.sh` copies over and reloads (herdr issue #5183). `prefix+?` lists the selected machine's keys.
 
@@ -34,7 +34,7 @@ Sync rules:
 - Mode is two-way-safe. If both sides change the same file, that file pauses with a conflict and neither copy is overwritten. See them with `mutagen sync list`.
 - Deletions propagate both ways, like any other change.
 - Only folders inside `$HOME` are synced; an agent in `/tmp` gets an empty folder on the VPS.
-- `sh sync-dir.sh <dir>` syncs a folder without forking anything. `mutagen sync terminate <name>` stops it, and both copies stay.
+- `sh laptop/sync-dir.sh <dir>` syncs a folder without forking anything. `mutagen sync terminate <name>` stops it, and both copies stay.
 
 `prefix+u` (the prefix is `ctrl+b` unless `keys.prefix` says otherwise) on a VPS agent opens **Files · drop box** beside it: the agent's folder, newest first. Drag a file from the laptop's file manager onto the box and it is uploaded into that folder: a spinner while it runs, ✓ once it is listed. The copy goes through the laptop's linked herdr (an `upload: …` workspace flashes there), so `femme-link` must be running; the box says `laptop not linked` otherwise. A drop lands in the focused pane, so the box must be it (herdr's blue border): unfocused, it dims and shows a yellow *click here first* bar. A dropped image takes herdr's own image bridge, and a file from a synced folder is copied on the VPS side. `q` closes the box.
 
@@ -43,12 +43,12 @@ Sync rules:
 Agents run on the VPS (its RAM) while the heavy files and the toolchain stay on the laptop: the folder's text syncs as above, and the agent builds on the laptop with `pc <command>`.
 
 ```sh
-./pc-setup.sh                               # once, on the laptop: sshd on 127.0.0.1 only, the VPS's key, the link forwards it
+./laptop/pc-setup.sh                               # once, on the laptop: sshd on 127.0.0.1 only, the VPS's key, the link forwards it
 ```
 
 `pc` needs a Linux laptop (Arch, Debian/Ubuntu or Fedora) for now.
 
-Then per folder, on the laptop: put what must not leave it in `<dir>/.femme-ignore`, one Mutagen pattern per line, and sync it (`sh sync-dir.sh <dir>`, or `prefix+shift+v` on an agent there):
+Then per folder, on the laptop: put what must not leave it in `<dir>/.femme-ignore`, one Mutagen pattern per line, and sync it (`sh laptop/sync-dir.sh <dir>`, or `prefix+shift+v` on an agent there):
 
 ```
 # big inputs and the build stay on the laptop

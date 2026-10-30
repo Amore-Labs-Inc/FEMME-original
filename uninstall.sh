@@ -6,7 +6,7 @@
 #   ./uninstall.sh aws      lists what provision.sh made and prints the commands to delete it; runs none of them
 set -uo pipefail
 cd "$(dirname "$0")"
-. ./lib.sh
+. ./laptop/lib.sh
 [ -f .env ] || die "no .env here: nothing to uninstall from this checkout"
 . ./.env
 

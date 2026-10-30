@@ -3,7 +3,7 @@ Description=Push herdr agent state changes to ntfy
 After=herdr-server.service
 
 [Service]
-ExecStart=%h/femme/notify.sh
+ExecStart=%h/femme/server/notify.sh
 Restart=always
 RestartSec=5
 

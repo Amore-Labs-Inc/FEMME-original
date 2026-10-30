@@ -24,7 +24,7 @@ d=$PWD; until mutagen sync list "$(n "$d")" >/dev/null 2>&1; do d=${d%/*}; [ -n 
 flush() { [ -n "${PC_NOFLUSH:-}" ] || timeout 60 ssh -o BatchMode=yes pc "exec \$SHELL -lc '$(esc "$here; $sync")'"; }
 explain() {
   case $1 in
-    97) echo "pc: $PWD is not shared from the laptop; there, run: sh sync-dir.sh $PWD (from the FEMME checkout)" >&2 ;;
+    97) echo "pc: $PWD is not shared from the laptop; there, run: sh laptop/sync-dir.sh $PWD (from the FEMME checkout)" >&2 ;;
     98) echo "pc: mutagen on the laptop failed or is missing: is mutagen.service running there? (PC_NOFLUSH=1 skips the flush)" >&2 ;;
     124) echo "pc: the laptop is not answering" >&2 ;;
     255) echo "pc: the link is up but the laptop's sshd did not answer: stale link after sleep (try again in a minute), or pc-setup.sh was never run there" >&2 ;;

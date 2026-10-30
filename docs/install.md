@@ -16,7 +16,7 @@ git clone <this repo> femme && cd femme
 | checks the tools this laptop needs, makes an SSH key if you have none | have a server: an AWS account, or an Ubuntu 24.04 VPS with an account that can `sudo` |
 | writes `.env`, with a random notification topic | sign in on the server once: `claude` then `/login`; `gh auth login && gh auth setup-git` |
 | prepares the server: your user, key-only SSH, swap, packages, start at boot | for a public board only: a DNS A record, and a Resend key if you want emailed sign-in links |
-| installs herdr, the agents and their toolchains, the board and the services | optional: `./laptop-setup.sh`, the phone apps |
+| installs herdr, the agents and their toolchains, the board and the services | optional: `./laptop/laptop-setup.sh`, the phone apps |
 | adds `Host <alias>` to `~/.ssh/config` and checks everything | |
 
 FEMME never copies your credentials to the server: you sign in there yourself.
@@ -35,7 +35,7 @@ The laptop side (forking agents, the drop box, `laptop-setup.sh`) works on Linux
 
 ### 1. A server you already have
 
-You need an account on it that can `sudo` (often `root` or `ubuntu`) and your SSH key on it. `install.sh` asks for that account as `user@address` and runs [`host-init.sh`](../host-init.sh), which:
+You need an account on it that can `sudo` (often `root` or `ubuntu`) and your SSH key on it. `install.sh` asks for that account as `user@address` and runs [`host-init.sh`](../laptop/host-init.sh), which:
 
 - makes a user with the same name as on your laptop, so synced folders keep their paths;
 - gives it your key and passwordless `sudo`;
@@ -44,7 +44,7 @@ You need an account on it that can `sudo` (often `root` or `ubuntu`) and your SS
 
 ### 2. A new AWS instance
 
-`install.sh` runs [`provision.sh`](../provision.sh): an Ubuntu 24.04 instance (`INSTANCE_TYPE`, `DISK_GB`, `REGION` in `.env`), a security group with SSH and mosh open, an Elastic IP and termination protection. It reuses everything tagged `femme`, so it is safe to rerun. By default the instance gets no AWS access; see [AWS](aws.md) for the optional role and for a spend brake.
+`install.sh` runs [`provision.sh`](../laptop/provision.sh): an Ubuntu 24.04 instance (`INSTANCE_TYPE`, `DISK_GB`, `REGION` in `.env`), a security group with SSH and mosh open, an Elastic IP and termination protection. It reuses everything tagged `femme`, so it is safe to rerun. By default the instance gets no AWS access; see [AWS](aws.md) for the optional role and for a spend brake.
 
 ### 3. This machine
 
@@ -53,7 +53,7 @@ Choose it on a Linux machine that stays on (a home server or a desktop). FEMME t
 ## The board: private or public
 
 - **Private (default):** the board listens on the server's localhost only. Open it through a tunnel: `ssh -N -L 8787:127.0.0.1:8787 <alias>`, then http://localhost:8787. Without Resend, the sign-in link is in `ssh <alias> journalctl --user -u femme-board -n 20`.
-- **Public:** for a bot or agent that calls the API from another machine. `install.sh` asks for an `https://` address; point a DNS A record (DNS only, no proxy) at the server, open ports 80 and 443 if your provider has a firewall (`provision.sh` opens them on AWS), and run `./sync.sh`. Caddy gets the certificate. Read [SECURITY.md](../SECURITY.md) first.
+- **Public:** for a bot or agent that calls the API from another machine. `install.sh` asks for an `https://` address; point a DNS A record (DNS only, no proxy) at the server, open ports 80 and 443 if your provider has a firewall (`provision.sh` opens them on AWS), and run `./laptop/sync.sh`. Caddy gets the certificate. Read [SECURITY.md](../SECURITY.md) first.
 
 ## Check, update, remove
 
@@ -69,9 +69,9 @@ Choose it on a Linux machine that stays on (a home server or a desktop). FEMME t
 
 ```sh
 cp .env.example .env && chmod 600 .env       # then edit it: every setting is explained there
-./provision.sh                              # AWS only; or, for any other server:
-./host-init.sh root@203.0.113.7
-./sync.sh                                   # copies agent and herdr config, runs bootstrap.sh on the server
+./laptop/provision.sh                              # AWS only; or, for any other server:
+./laptop/host-init.sh root@203.0.113.7
+./laptop/sync.sh                                   # copies agent and herdr config, runs bootstrap.sh on the server
 ssh agentbox                                # sign in: claude (/login), gh auth login && gh auth setup-git
 ./doctor.sh
 ```

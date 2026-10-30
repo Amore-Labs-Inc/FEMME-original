@@ -3,7 +3,7 @@
 # here and rerun bootstrap.sh, which rebuilds the board and restarts the services. The result
 # shows on the board until you close it.
 set -uo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 # Braces: bash reads the whole block before running it, so the reset below can rewrite this file.
 {
   state=$HOME/.local/state/femme
@@ -19,7 +19,7 @@ cd "$(dirname "$0")"
   git reset -q --hard "$new"
   what=$(git log -1 --format='%h %s')
   report null "deploying $what"
-  if out=$(HERDR_VERSION=$(herdr --version | cut -d' ' -f2) ./bootstrap.sh 2>&1); then
+  if out=$(HERDR_VERSION=$(herdr --version | cut -d' ' -f2) ./server/bootstrap.sh 2>&1); then
     report true "deployed $what"
   else
     report false "$what failed to deploy (full log: journalctl --user -u femme-deploy)

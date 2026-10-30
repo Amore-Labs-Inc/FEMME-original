@@ -4,7 +4,7 @@ After=femme-cswap.service
 
 [Service]
 Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=%h/femme/fable-cap.sh
+ExecStart=%h/femme/server/fable-cap.sh
 Restart=always
 RestartSec=60
 

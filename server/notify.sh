@@ -2,7 +2,7 @@
 # Push to ntfy when a herdr agent turns blocked or done.
 # ponytail: polls the snapshot every 5s; switch to an event stream if herdr grows one.
 set -u
-. "$(dirname "$0")/.env"
+. "$(dirname "$0")/../.env"
 herdr=$HOME/.local/bin/herdr
 declare -A last
 while sleep 5; do

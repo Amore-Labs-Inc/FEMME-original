@@ -5,7 +5,7 @@
 # which keeps the engine from landing on it, and the box moves to the account with the most left,
 # Fable counted. A held account comes back when its week resets. Only accounts held here are re-enabled.
 set -u
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 . ./.env
 FABLE_CAP=${FABLE_CAP:-96}
 held=$HOME/.local/state/femme/fable-held  # account numbers this loop disabled, one per line

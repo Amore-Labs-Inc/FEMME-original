@@ -11,6 +11,6 @@ edited here and the results come back.
 - Edit, read, grep and git here. Use `pc` for building, running, testing and for reading files
   that are not synced. Never copy heavy files to the VPS.
 - `pc true` says whether the current folder is shared; if not, ask the user to run
-  `sh sync-dir.sh <dir>` from the FEMME checkout on the PC.
+  `sh laptop/sync-dir.sh <dir>` from the FEMME checkout on the PC.
 - "laptop not linked" means the PC is asleep or away: keep editing, tell the user what is
   waiting on the PC, and do not retry in a loop.

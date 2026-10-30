@@ -3,7 +3,7 @@
 # Exit status: the number of problems (0 = all good). Safe to run any time; it changes nothing.
 set -uo pipefail
 cd "$(dirname "$0")"
-. ./lib.sh
+. ./laptop/lib.sh
 [ -f .env ] || die "no .env here: run ./install.sh first"
 . ./.env
 bad=0
@@ -43,21 +43,21 @@ fact() { printf '%s\n' "$facts" | awk -F'\t' -v k="$1" '$1==k {print $2; exit}';
 
 while IFS=$'\t' read -r kind u state; do
   [ "$kind" = unit ] || continue
-  [ "$state" = active ] && ok "$u running" || no "$u is ${state:-unknown}" "ssh $HOST journalctl --user -u $u -n 30   (then ./sync.sh)"
+  [ "$state" = active ] && ok "$u running" || no "$u is ${state:-unknown}" "ssh $HOST journalctl --user -u $u -n 30   (then ./laptop/sync.sh)"
 done <<<"$facts"
 
 v=$(fact herdr); lv=$(herdr --version 2>/dev/null | cut -d' ' -f2)
-if [ -z "$v" ]; then no "herdr is not installed on the server" "./sync.sh"
-elif [ -n "$lv" ] && [ "$v" != "$lv" ]; then no "herdr $v on the server, $lv here" "./sync.sh (the server follows the laptop's version)"
+if [ -z "$v" ]; then no "herdr is not installed on the server" "./laptop/sync.sh"
+elif [ -n "$lv" ] && [ "$v" != "$lv" ]; then no "herdr $v on the server, $lv here" "./laptop/sync.sh (the server follows the laptop's version)"
 else ok "herdr $v"; fi
 case $(fact claude) in
   in) ok "Claude Code signed in" ;;
   out) no "Claude Code is not signed in on the server" "ssh $HOST, run claude, then /login" ;;
-  *) no "Claude Code is not installed on the server" "./sync.sh (it installs Claude Code)" ;;
+  *) no "Claude Code is not installed on the server" "./laptop/sync.sh (it installs Claude Code)" ;;
 esac
 [ "$(fact gh)" = in ] && ok "GitHub CLI signed in" || no "GitHub CLI is not signed in on the server" "ssh $HOST 'gh auth login && gh auth setup-git'"
 [ "$(fact linger)" = yes ] && ok "services start at boot (linger)" || no "services stop when you log out" "ssh $HOST sudo loginctl enable-linger \$USER"
-[ "$(fact swap)" -gt 0 ] 2>/dev/null && ok "swap" || no "no swap: agents can run the server out of memory" "./host-init.sh <admin>@<server> (or add a swapfile)"
+[ "$(fact swap)" -gt 0 ] 2>/dev/null && ok "swap" || no "no swap: agents can run the server out of memory" "./laptop/host-init.sh <admin>@<server> (or add a swapfile)"
 
 if [ -n "${BOARD_URL:-}" ]; then
   say "board"

@@ -3,13 +3,13 @@
 # what cloud-init.yaml does on AWS, over ssh. Your user (same name as here, so paths match), key-only
 # SSH, mosh, 8 GB swap, linger; then a "Host $HOST" entry in ~/.ssh/config. Safe to rerun.
 #
-# Usage: ./host-init.sh <admin>@<server>    an account there that can sudo, e.g. root@203.0.113.7
+# Usage: ./laptop/host-init.sh <admin>@<server>    an account there that can sudo, e.g. root@203.0.113.7
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."  # the checkout root: .env and every path below are relative to it
 [ -f .env ] || cp .env.example .env
 . ./.env
-. ./lib.sh
-admin=${1:?usage: ./host-init.sh <admin>@<server>}
+. ./laptop/lib.sh
+admin=${1:?usage: ./laptop/host-init.sh <admin>@<server>}
 server=${admin#*@}
 pub=~/.ssh/id_ed25519.pub
 [ -f "$pub" ] || die "no $pub: make one with ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519"
@@ -47,4 +47,4 @@ REMOTE
 ssh_config_block "$HOST" "$server" "$USER"
 setenv IP "$server"
 ssh -o BatchMode=yes "$HOST" true || die "could not log in as $USER@$server with your key; root login is now off, so use: ssh $USER@$server"
-say "$HOST is ready. Next: ./sync.sh"
+say "$HOST is ready. Next: ./laptop/sync.sh"

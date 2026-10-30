@@ -6,12 +6,12 @@
 #   ./install.sh update    pull this checkout, push it to the server, check
 set -euo pipefail
 cd "$(dirname "$0")"
-. ./lib.sh
+. ./laptop/lib.sh
 
 if [ "${1:-}" = update ]; then
   [ -f .env ] || die "no .env: run ./install.sh first"
   git pull --ff-only
-  ./sync.sh
+  ./laptop/sync.sh
   ./doctor.sh
   exit
 fi
@@ -86,14 +86,14 @@ say "3/5 the server"
 case $where in
   1)
     command -v aws >/dev/null || die "install the AWS CLI and sign in (aws configure, or aws login), then rerun"
-    ./provision.sh
+    ./laptop/provision.sh
     say "waiting for the first boot to finish"
     for _ in $(seq 30); do ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new "$HOST" true 2>/dev/null && break; sleep 10; done
     ssh "$HOST" cloud-init status --wait >/dev/null
     ;;
   2)
     read -r -p "An account on the server that can sudo, as user@address (e.g. root@203.0.113.7): " admin
-    ./host-init.sh "$admin"
+    ./laptop/host-init.sh "$admin"
     ;;
   3)
     ssh -o BatchMode=yes localhost true 2>/dev/null \
@@ -102,7 +102,7 @@ case $where in
 esac
 
 say "4/5 installing on $HOST (a few minutes the first time)"
-./sync.sh
+./laptop/sync.sh
 
 say "5/5 checking"
 ./doctor.sh || true
@@ -118,7 +118,7 @@ What is left for you (FEMME never copies your credentials):
 EOF
 [ -z "${BOARD_URL:-}" ] || if [ "${BOARD_PUBLIC:-0}" = 1 ]; then cat <<EOF
   2. Point a DNS A record for ${BOARD_URL#https://} at ${IP:-the server address} (DNS only, no proxy),
-     open ports 80 and 443 if your provider has a firewall, then ./sync.sh once more for the certificate.
+     open ports 80 and 443 if your provider has a firewall, then ./laptop/sync.sh once more for the certificate.
 EOF
 else cat <<EOF
   2. Open the board: ssh -N -L 8787:127.0.0.1:8787 $HOST, then http://localhost:8787.
@@ -126,7 +126,7 @@ else cat <<EOF
 EOF
 fi
 cat <<EOF
-  3. This laptop (forking agents, drop box, its terminals on the board): ./laptop-setup.sh
+  3. This laptop (forking agents, drop box, its terminals on the board): ./laptop/laptop-setup.sh
   4. Optional, phone: the ntfy app, subscribed to the NTFY_TOPIC in .env; Moshi or Blink for a terminal (docs/phone.md).
      Or skip the phone apps and drive FEMME from a chat bot (e.g. Instinct on WhatsApp) through the API (docs/api.md).
 EOF

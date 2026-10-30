@@ -15,7 +15,7 @@ shot() {  # page width height name [query]
   echo "$4"
 }
 shot banner.html 1280 460 banner
-shot instinct.html 1280 640 instinct
+shot instinct.html 1280 680 instinct
 shot architecture.html 1280 560 architecture
 shot install.html 1280 420 install
 shot features.html 1280 580 features

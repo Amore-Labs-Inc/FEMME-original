@@ -23,10 +23,9 @@ retry() {  # rerun while EC2 has not yet heard of the new instance profile (take
 
 sg=$(aws ec2 describe-security-groups --filters Name=group-name,Values=femme --query 'SecurityGroups[0].GroupId')
 if [ "$sg" = None ]; then
-  sg=$(aws ec2 create-security-group --group-name femme --description "femme ssh + mosh" --query GroupId)
+  sg=$(aws ec2 create-security-group --group-name femme --description "femme ssh" --query GroupId)
   aws ec2 authorize-security-group-ingress --group-id "$sg" --ip-permissions \
-    'IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=0.0.0.0/0}]' \
-    'IpProtocol=udp,FromPort=60000,ToPort=61000,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null
+    'IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=0.0.0.0/0}]' >/dev/null
 fi
 if [ "${BOARD_PUBLIC:-0}" = 1 ]; then  # public board (opt-in): Caddy needs 80 for the certificate challenge, 443 to serve
   aws ec2 authorize-security-group-ingress --group-id "$sg" --ip-permissions \

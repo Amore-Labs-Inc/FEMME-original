@@ -24,7 +24,7 @@ Three commands sit at the top: `install.sh`, `doctor.sh`, `uninstall.sh`. The re
 | `doctor.sh` | laptop | Checks the installation; each problem comes with the fix. |
 | `install.sh` | laptop | The one entry point: questions, `.env`, server, check. `update` pulls and updates. |
 | `uninstall.sh` | laptop | Takes FEMME off the server or the laptop; lists AWS resources without deleting them. |
-| `laptop/cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, mosh, 8 GB swap, linger. |
+| `laptop/cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, 8 GB swap, linger. |
 | `laptop/host-init.sh` | laptop | Prepares an existing Ubuntu 24.04 server over ssh, as `cloud-init.yaml` does on AWS. |
 | `laptop/laptop-setup.sh` | laptop | herdr machine, plugin, keys and the background services (Linux or macOS). |
 | `laptop/lib.sh` | laptop | Helpers the laptop scripts share. |

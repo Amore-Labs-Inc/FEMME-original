@@ -39,7 +39,7 @@ Any bot or agent can do the same with an API key: see [API](docs/api.md) and the
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/architecture-dark.png">
-  <img alt="Instinct on WhatsApp, your laptop, the browser and an optional phone all reach one server you own, which runs the agents, the board and API, the worker and notifications. Nothing is open to the internet unless you turn it on." src="assets/architecture-light.png" width="100%">
+  <img alt="Instinct on WhatsApp, your laptop and the browser all reach one server you own, which pushes notifications to your phone;, which runs the agents, the board and API, the worker and notifications. Nothing is open to the internet unless you turn it on." src="assets/architecture-light.png" width="100%">
 </picture>
 
 - **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
@@ -73,7 +73,7 @@ Afterwards: `./doctor.sh` checks everything, `./install.sh update` updates, `./u
 | [API & Instinct](docs/api.md) | use FEMME from a chat bot or another agent; a [minimal client](examples/api-client.sh) |
 | [Laptop](docs/laptop.md) | forking agents, folder sync, drop box, building on the laptop with `pc` |
 | [Board](docs/board.md) | issues, terminals and sessions in the browser |
-| [Phone](docs/phone.md) | optional: a terminal and notifications on the phone |
+| [Notifications](docs/notifications.md) | a push to your phone when an agent needs you or is done |
 | [Claude accounts](docs/accounts.md) | the accounts window, optional rotation between accounts |
 | [AWS](docs/aws.md) | the optional instance role, a spend brake |
 | [Troubleshooting](docs/troubleshooting.md) | common errors and their fixes |

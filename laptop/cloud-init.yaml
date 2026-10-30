@@ -10,7 +10,7 @@ ssh_pwauth: false
 disable_root: true
 package_update: true
 package_upgrade: true
-packages: [mosh, jq, git, rsync, build-essential, curl, unzip]
+packages: [jq, git, rsync, build-essential, curl, unzip]
 swap:
   filename: /swapfile
   size: 8G

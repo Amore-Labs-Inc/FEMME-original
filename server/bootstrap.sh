@@ -32,7 +32,7 @@ mkdir -p ~/.local/bin
 }
 # A macOS laptop's folders live under /Users/<you>; synced folders keep their path here, so /Users points at /home.
 [ -e /Users ] || sudo ln -s /home /Users
-# Non-interactive ssh/mosh (`mosh agentbox -- herdr`) has no ~/.local/bin on PATH.
+# Non-interactive ssh (`ssh agentbox herdr ...`) has no ~/.local/bin on PATH.
 sudo ln -sf ~/.local/bin/herdr /usr/local/bin/herdr
 # Integrations need each agent's config dir, which only appears after its first run.
 mkdir -p ~/.codex ~/.pi/agent ~/.config/opencode

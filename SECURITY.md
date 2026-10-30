@@ -21,7 +21,7 @@ These parts are off unless you turn them on in `.env`:
 | `AUTODEPLOY=1` | The server deploys `main` from GitHub on its own. Anyone who can merge can then run code on it. |
 | `ACCOUNT_ROTATION=1` | The server switches between stored Claude accounts by usage. |
 
-SSH is key-only (`cloud-init.yaml`). SSH and mosh are open to the internet so the phone can connect. If you use a VPN such as Tailscale, you can close them to everything else.
+SSH is key-only (`laptop/cloud-init.yaml`, `laptop/host-init.sh`) and is the only port open by default. If you use a VPN such as Tailscale, you can close it to everything else.
 
 ## Reporting a vulnerability
 

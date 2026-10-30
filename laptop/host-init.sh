@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Prepare an existing Ubuntu 24.04 server that provision.sh did not make (any VPS, a home server):
 # what cloud-init.yaml does on AWS, over ssh. Your user (same name as here, so paths match), key-only
-# SSH, mosh, 8 GB swap, linger; then a "Host $HOST" entry in ~/.ssh/config. Safe to rerun.
+# SSH, 8 GB swap, linger; then a "Host $HOST" entry in ~/.ssh/config. Safe to rerun.
 #
 # Usage: ./laptop/host-init.sh <admin>@<server>    an account there that can sudo, e.g. root@203.0.113.7
 set -euo pipefail
@@ -25,7 +25,7 @@ set -euo pipefail
 user=$1 key=$2 host=$3
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq mosh jq git rsync build-essential curl unzip >/dev/null
+apt-get install -y -qq jq git rsync build-essential curl unzip >/dev/null
 id "$user" >/dev/null 2>&1 || useradd -m -s /bin/bash "$user"
 echo "$user ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-femme && chmod 440 /etc/sudoers.d/90-femme
 home=$(getent passwd "$user" | cut -d: -f6)

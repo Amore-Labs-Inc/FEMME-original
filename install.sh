@@ -128,6 +128,6 @@ EOF
 fi
 cat <<EOF
   3. This laptop (forking agents, drop box, its terminals on the board): ./laptop/laptop-setup.sh
-  4. Optional, phone: the ntfy app, subscribed to the NTFY_TOPIC in .env; Moshi or Blink for a terminal (docs/phone.md).
-     Or skip the phone apps and drive FEMME from a chat bot (e.g. Instinct on WhatsApp) through the API (docs/api.md).
+  4. Optional: notifications on your phone, the ntfy app subscribed to the NTFY_TOPIC in .env (docs/notifications.md).
+     To hand FEMME tasks from a chat bot (e.g. Instinct on WhatsApp), see docs/api.md.
 EOF

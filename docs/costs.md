@@ -10,6 +10,6 @@ FEMME itself is free. What you pay for, and what is optional:
 | Codex or Pi | optional | their own plans |
 | A domain, for the public board only | optional | about $10–15/year |
 | Resend, for emailed sign-in links | optional | free tier is enough; without it, links appear in the server log |
-| ntfy.sh notifications, Moshi or Blink on the phone | optional | free, or the apps' own prices |
+| ntfy.sh notifications on your phone | optional | free |
 
 Prices change; check your provider's. On AWS, set a spend brake (see [AWS](aws.md)): agents with `AWS_ROLE=spawn` can launch instances that cost money too.

@@ -16,7 +16,7 @@ git clone <this repo> femme && cd femme
 | checks the tools this laptop needs (on macOS, a current rsync: `brew install rsync`), makes an SSH key if you have none | have a server: an AWS account, or an Ubuntu 24.04 VPS with an account that can `sudo` |
 | writes `.env`, with a random notification topic | sign in on the server once: `claude` then `/login`; `gh auth login && gh auth setup-git` |
 | prepares the server: your user, key-only SSH, swap, packages, start at boot | for a public board only: a DNS A record, and a Resend key if you want emailed sign-in links |
-| installs herdr, the agents and their toolchains, the board and the services | optional: `./laptop/laptop-setup.sh`, the phone apps |
+| installs herdr, the agents and their toolchains, the board and the services | optional: `./laptop/laptop-setup.sh`, the ntfy app for notifications |
 | adds `Host <alias>` to `~/.ssh/config` and checks everything | |
 
 FEMME never copies your credentials to the server: you sign in there yourself.
@@ -39,12 +39,12 @@ You need an account on it that can `sudo` (often `root` or `ubuntu`) and your SS
 
 - makes a user with the same name as on your laptop, so synced folders keep their paths;
 - gives it your key and passwordless `sudo`;
-- installs mosh, git, jq, rsync, curl and build tools, adds 8 GB of swap if there is none, keeps your services running after you log out;
+- installs git, jq, rsync, curl and build tools, adds 8 GB of swap if there is none, keeps your services running after you log out;
 - turns off password and root login over SSH, only after your key works.
 
 ### 2. A new AWS instance
 
-`install.sh` runs [`provision.sh`](../laptop/provision.sh): an Ubuntu 24.04 instance (`INSTANCE_TYPE`, `DISK_GB`, `REGION` in `.env`), a security group with SSH and mosh open, an Elastic IP and termination protection. It reuses everything tagged `femme`, so it is safe to rerun. By default the instance gets no AWS access; see [AWS](aws.md) for the optional role and for a spend brake.
+`install.sh` runs [`provision.sh`](../laptop/provision.sh): an Ubuntu 24.04 instance (`INSTANCE_TYPE`, `DISK_GB`, `REGION` in `.env`), a security group with only SSH open, an Elastic IP and termination protection. It reuses everything tagged `femme`, so it is safe to rerun. By default the instance gets no AWS access; see [AWS](aws.md) for the optional role and for a spend brake.
 
 ### 3. This machine
 

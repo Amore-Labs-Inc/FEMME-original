@@ -61,11 +61,14 @@ choose() {
     [ "$cur" -ge 1 ] && [ "$cur" -le $n ] || die "pick a number from 1 to $n"
     eval "$var=\$cur"; return
   fi
+  # One screen line per option, or redrawing in place drifts: cut what the terminal is too narrow for.
+  local w; w=$(( $(tput cols 2>/dev/null || echo 80) - 6 ))
   printf '\033[?25l' >&2
   while :; do
     i=0
     for o in "$@"; do
       i=$((i + 1))
+      [ ${#o} -le $w ] || o="${o:0:$((w - 1))}…"
       if [ $i = "$cur" ]; then printf '\r\033[K  \033[36m❯ %s\033[0m\n' "$o" >&2; else printf '\r\033[K    \033[2m%s\033[0m\n' "$o" >&2; fi
     done
     IFS= read -rsn1 key

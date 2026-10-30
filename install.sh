@@ -74,9 +74,9 @@ is_admin() {  # user@address, and this laptop's key logs in there
 }
 
 choose where "Where will FEMME run?  (↑/↓, Enter)" \
-  "A new AWS instance (needs the AWS CLI signed in; it costs money)" \
-  "An Ubuntu 24.04 server you already have (any VPS or a home server, reachable over ssh)" \
-  "This machine (Linux only; agents stop when it sleeps)"
+  "A new AWS instance (AWS CLI signed in; costs money)" \
+  "An Ubuntu 24.04 server you have (a VPS, a home server)" \
+  "This machine (Linux only; stops when it sleeps)"
 if [ "$where" = 3 ]; then
   [ "$(uname -s)" = Linux ] || die "this machine as the server needs Linux with systemd"
   setenv HOST localhost; HOST=localhost

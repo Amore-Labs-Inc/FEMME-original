@@ -10,7 +10,7 @@
   <img alt="Agents: Claude Code, Codex, Pi" src="https://img.shields.io/badge/agents-Claude%20Code%20%7C%20Codex%20%7C%20Pi-7C3AED?style=flat-square">
 </p>
 
-FEMME runs coding agents (Claude Code, Codex, Pi) under [herdr](https://herdr.dev) on a server you own, so they keep working while your laptop sleeps. You reach them over SSH, in a web board, or through an HTTP API that bots like Instinct use. It is a set of shell scripts, systemd user services and one small Rust server; nothing is exposed to the internet unless you turn it on.
+FEMME keeps your coding agents running on a server you own. Start Claude Code, Codex or Pi, close the laptop, and they keep working. Check in from the browser, from your phone, or by texting them on WhatsApp.
 
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
@@ -19,18 +19,16 @@ FEMME runs coding agents (Claude Code, Codex, Pi) under [herdr](https://herdr.de
   <a href="#docs">Docs</a>
 </p>
 
-## Example: Instinct on WhatsApp
+## What it does
 
-We run FEMME this way. We write to [Instinct](https://instinct.com/) on WhatsApp: "fix the signup form in our repo". Instinct hands the task to FEMME through its API. Claude Code does the work on the server, checks it and writes a short report in plain words. Instinct sends us the report, and nothing is pushed until we answer "yes". No laptop and no terminal needed.
-
-Any bot or agent can do the same with an API key: see [API](docs/api.md) and the [minimal client](examples/api-client.sh).
-
-## How it fits together
-
-- **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
-- **Move an agent to the server.** One key in herdr forks a local agent, with its conversation and folder, onto the server. The folder then stays in two-way sync.
-- **Board and API.** An issue queue that agents turn into pull requests, live terminals, sessions, and the API that bots use.
-- **Notifications** on your phone when an agent needs you or is done.
+- **Agents that don't stop.** Claude Code, Codex and Pi run under [herdr](https://herdr.dev) on your server. They survive a closed lid, a dropped SSH connection and a reboot, and pick up their conversations where they left off.
+- **Talk to them from WhatsApp.** Connect [Instinct](https://instinct.com/), or any bot, with an API key. Text "fix the signup form in our repo", get a short report back in plain words, and nothing is pushed until you answer "yes". See [API](docs/api.md).
+- **Agents that talk to each other.** Through the same API one agent can read another's screen or hand it a task.
+- **Issues in, pull requests out.** Write an issue on the board; an agent clones the repo, does the work and opens a PR.
+- **A board in the browser.** Live terminals, sessions and the issue queue, made to work on a phone too.
+- **Move an agent to the server.** One key in herdr forks a local agent, with its conversation and folder, onto the server. The folder stays in two-way sync.
+- **A push when you are needed.** A notification on your phone when an agent is waiting for you or done.
+- **Yours, and closed by default.** Shell scripts, systemd user services and one small Rust server. Nothing is open to the internet unless you turn it on.
 
 ## Quick start
 

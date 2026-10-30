@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Laptop side, once (Arch Linux; elsewhere install and enable openssh first): lets `pc` on the VPS run commands here, in a synced folder
+# Laptop side, once (Linux: Arch, Debian/Ubuntu or Fedora): lets `pc` on the VPS run commands here, in a synced folder
 # (README: Work on PC files from the VPS). sshd listens on 127.0.0.1 only; the VPS reaches it
 # through the link this machine opens (femme-link.service), so nothing is exposed to the
 # network. Safe to rerun.
@@ -10,14 +10,19 @@ cd "$(dirname "$0")"
 command -v mutagen >/dev/null && systemctl --user is-enabled -q mutagen \
   || { echo "pc-setup: install mutagen and enable mutagen.service first (README, Laptop)" >&2; exit 1; }
 
-sudo pacman -S --needed --noconfirm openssh
+[ "$(uname -s)" = Linux ] || { echo "pc-setup: pc needs a Linux laptop for now" >&2; exit 1; }
+if command -v pacman >/dev/null; then sudo pacman -S --needed --noconfirm openssh
+elif command -v apt-get >/dev/null; then sudo apt-get install -y -qq openssh-server
+elif command -v dnf >/dev/null; then sudo dnf install -y -q openssh-server
+else echo "pc-setup: install the OpenSSH server yourself, then rerun" >&2; command -v sshd >/dev/null || exit 1; fi
 grep -q '^Include /etc/ssh/sshd_config.d/\*\.conf' /etc/ssh/sshd_config \
   || sudo sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config
 printf 'ListenAddress 127.0.0.1\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nAllowUsers %s\n' "$(id -un)" \
   | sudo tee /etc/ssh/sshd_config.d/femme.conf >/dev/null
 sudo sshd -t
-sudo systemctl enable --now sshd
-sudo systemctl reload sshd
+svc=sshd; systemctl list-unit-files ssh.service >/dev/null 2>&1 && svc=ssh
+sudo systemctl enable --now $svc
+sudo systemctl reload $svc
 
 # The VPS's own key (bootstrap.sh makes it) may log in here.
 key=$(ssh "$HOST" cat .ssh/id_ed25519.pub) || { echo "pc-setup: the VPS has no key yet: ./sync.sh first" >&2; exit 1; }

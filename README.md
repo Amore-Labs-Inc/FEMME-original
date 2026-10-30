@@ -10,36 +10,46 @@ Always-on [herdr](https://herdr.dev) on your own Linux server (an Ubuntu 24.04 V
 
 ## Setup
 
-Needs: `~/.ssh/id_ed25519` (no passphrase, the Mutagen service has no ssh-agent), herdr, jq, rsync, [mutagen](https://github.com/mutagen-io/mutagen/releases) in `~/.local/bin`.
-
-Copy `.env.example` to `.env` and read it: every setting is explained there, and the optional parts (public board, account rotation, auto-deploy, AWS role) are off until you turn them on.
-
-On AWS (needs the AWS CLI logged in; the instance costs money):
+On your laptop (Linux or macOS), from this checkout:
 
 ```sh
-./provision.sh                              # VPS + security group + Elastic IP, writes .env and ~/.ssh/config "Host agentbox"
-ssh agentbox cloud-init status --wait
-./sync.sh                                   # copies agent/herdr config, runs bootstrap.sh on the VPS
-ssh agentbox                                # one-time logins, credentials are never copied:
-#   claude            -> /login, paste the URL
-#   codex login --device-auth
-#   gh auth login && gh auth setup-git
+./install.sh
 ```
 
-On another Ubuntu 24.04 x86_64 server: make a user with the same name as on your laptop (so paths match), give it your key and passwordless sudo, apply what `cloud-init.yaml` lists (swap, key-only SSH, packages, `loginctl enable-linger`), add a `Host agentbox` entry to `~/.ssh/config`, then run `./sync.sh` and log in as above. A one-command installer for this is planned.
+It asks where FEMME should run (a new AWS instance, an Ubuntu 24.04 server you already have, or this machine), which optional parts you want, and writes the answers to `.env` (readable only by you). Then it prepares the server, installs everything on it and checks the result with `./doctor.sh`.
 
-`.env` is gitignored and holds your server's address and secrets.
+What it does for you: the server's user, SSH hardening, swap, packages, herdr, agents and toolchains, the board, the services, your `~/.ssh/config` entry, the check.
+
+What you do yourself, and it tells you when:
+- have the server (an AWS account, or any Ubuntu 24.04 x86_64 VPS with an account that can sudo);
+- sign in on the server once: `claude` then `/login`, `gh auth login && gh auth setup-git` (FEMME never copies your credentials);
+- for a public board only: a DNS A record and, if you want emailed sign-in links, a Resend key.
+
+Later: `./install.sh update` pulls this checkout and updates the server; `./doctor.sh` checks everything again; `./uninstall.sh server|laptop|aws` takes it off.
+
+Every setting is explained in `.env.example`. The optional parts (public board, account rotation, auto-deploy, AWS role) are off until you turn them on.
+
+<details><summary>By hand, without install.sh</summary>
+
+```sh
+cp .env.example .env && chmod 600 .env       # then edit it
+./provision.sh                              # AWS only: VPS + security group + Elastic IP, ~/.ssh/config "Host agentbox"
+./host-init.sh root@203.0.113.7             # any other Ubuntu 24.04 server: the same preparation over ssh
+./sync.sh                                   # copies agent/herdr config, runs bootstrap.sh on the server
+ssh agentbox                                # one-time sign-ins: claude (/login), gh auth login && gh auth setup-git
+./doctor.sh
+```
+</details>
 
 ### Laptop
 
 ```sh
-herdr machine add agentbox --label agentbox --remote-session default
-herdr plugin link "$PWD"
-cp systemd/mutagen.service ~/.config/systemd/user/ && systemctl --user enable --now mutagen
-cp systemd/femme-link.service ~/.config/systemd/user/ && systemctl --user enable --now femme-link  # laptop terminals on the board
+./laptop-setup.sh
 ```
 
-Add to `~/.config/herdr/config.toml`, then `./sync.sh`. A `[[keys.command]]` binding belongs to the machine selected in herdr, not to the client: the fork key is used on Local panes, so the laptop's own copy serves it (`herdr server reload-config` is enough), but the drop box key is pressed on agentbox panes, so it must be in the VPS's `config.toml` too, which `sync.sh` copies over and reloads (herdr issue #5183). `prefix+?` lists the selected machine's keys.
+On Linux (systemd) or macOS (launchd): adds the server as a herdr machine, links this checkout as the `femme` plugin, adds its two keys to `~/.config/herdr/config.toml`, and starts Mutagen and `femme-link` (this laptop's terminals on the board). Needs herdr; Mutagen only for forking and sync. macOS support is new: report what does not work. Run `./sync.sh` afterwards so the server gets the keys too.
+
+The keys it adds are below. A `[[keys.command]]` binding belongs to the machine selected in herdr, not to the client: the fork key is used on Local panes, so the laptop's own copy serves it (`herdr server reload-config` is enough), but the drop box key is pressed on agentbox panes, so it must be in the VPS's `config.toml` too, which `sync.sh` copies over and reloads (herdr issue #5183). `prefix+?` lists the selected machine's keys.
 
 ```toml
 [[keys.command]]
@@ -76,6 +86,8 @@ Agents run on the VPS (its RAM) while the heavy files and the toolchain stay on 
 ```sh
 ./pc-setup.sh                               # once, on the laptop: sshd on 127.0.0.1 only, the VPS's key, the link forwards it
 ```
+
+`pc` needs a Linux laptop (Arch, Debian/Ubuntu or Fedora) for now.
 
 Then per folder, on the laptop: put what must not leave it in `<dir>/.femme-ignore`, one Mutagen pattern per line, and sync it (`sh sync-dir.sh <dir>`, or `prefix+shift+v` on an agent there):
 
@@ -157,6 +169,12 @@ The board's **accounts** page (the ⋯ button) lists every Claude account stored
 
 | File | Runs on | Does |
 |---|---|---|
+| `install.sh` | laptop | The one entry point: questions, `.env`, server, check. `update` pulls and updates. |
+| `host-init.sh` | laptop | Prepares an existing Ubuntu 24.04 server over ssh, as `cloud-init.yaml` does on AWS. |
+| `doctor.sh` | laptop | Checks the installation; each problem comes with the fix. |
+| `uninstall.sh` | laptop | Takes FEMME off the server or the laptop; lists AWS resources without deleting them. |
+| `laptop-setup.sh` | laptop | herdr machine, plugin, keys and the background services (Linux or macOS). |
+| `lib.sh` | laptop | Helpers the laptop scripts share. |
 | `provision.sh` | laptop | Creates the instance. Safe to rerun; reuses everything tagged `femme`. |
 | `cloud-init.yaml` | VPS, first boot | Your user (same name as on the laptop, so paths match), key-only SSH, mosh, 8 GB swap, linger. |
 | `sync.sh` | laptop | Copies config: `~/.claude` minus credentials and history, herdr, mise. Merges onboarding, trust and portable MCP servers into the VPS `~/.claude.json`. |

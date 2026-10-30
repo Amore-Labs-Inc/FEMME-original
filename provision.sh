@@ -4,9 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 [ -f .env ] || cp .env.example .env
 . ./.env
+. ./lib.sh
 aws() { command aws --region "$REGION" --output text "$@"; }
-# Portable (GNU and BSD/macOS): rewrite .env with KEY=value replaced or appended.
-setenv() { awk -v k="$1" -v v="$2" 'BEGIN{FS=OFS="="} $1==k{print k "=" v; f=1; next} {print} END{if(!f) print k "=" v}' .env > .env.tmp && mv .env.tmp .env; }
 tag() { echo "ResourceType=$1,Tags=[{Key=Name,Value=femme}]"; }
 retry() {  # rerun while EC2 has not yet heard of the new instance profile (takes a few seconds)
   for _ in 1 2 3 4 5 6; do
@@ -82,17 +81,5 @@ fi
 aws ec2 associate-address --instance-id "$id" --allocation-id "$alloc" >/dev/null
 setenv IP "$ip"
 
-if ! grep -q "^Host $HOST\$" ~/.ssh/config; then
-  cat >> ~/.ssh/config <<EOF
-Host $HOST
-    HostName $ip
-    User $USER
-    IdentityFile ~/.ssh/id_ed25519
-    IdentitiesOnly yes
-    ServerAliveInterval 30
-    ControlMaster auto
-    ControlPath ~/.ssh/cm-%r@%h:%p
-    ControlPersist 10m
-EOF
-fi
+ssh_config_block "$HOST" "$ip" "$USER"
 echo "$HOST is $ip ($id). Next: ssh $HOST cloud-init status --wait && ./sync.sh"

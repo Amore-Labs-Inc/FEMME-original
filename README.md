@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.png">
-  <img alt="FEMME, open source by Exposure: your coding agents keep working after you close the laptop. Claude Code, Codex and Pi on a server you own. The board shows a task from Instinct waiting for your yes, two issues being worked on, and a pull request ready." src="assets/banner-light.png" width="100%">
+  <img alt="FEMME, open source by Exposure: Claude Code, Codex and Pi on a server you own. They keep working after you close the laptop: three agents still running over ssh while the laptop lid is closed." src="assets/banner-light.png" width="100%">
 </picture>
 
 <p align="center">
@@ -19,28 +19,13 @@ FEMME runs coding agents (Claude Code, Codex, Pi) under [herdr](https://herdr.de
   <a href="#docs">Docs</a>
 </p>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/features-dark.png">
-  <img alt="What it does: survives sleep and reboots; one key moves a running agent to the server; a queue that turns issues into pull requests; live terminals in the browser and a push to your phone when an agent needs you." src="assets/features-light.png" width="100%">
-</picture>
-
 ## Example: Instinct on WhatsApp
 
 We run FEMME this way. We write to [Instinct](https://instinct.com/) on WhatsApp: "fix the signup form in our repo". Instinct hands the task to FEMME through its API. Claude Code does the work on the server, checks it and writes a short report in plain words. Instinct sends us the report, and nothing is pushed until we answer "yes". No laptop and no terminal needed.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/instinct-dark.png">
-  <img alt="Example, Instinct on WhatsApp: you text a task, Claude Code does it on your server, you get a five-line report, and it ships only when you say yes." src="assets/instinct-light.png" width="100%">
-</picture>
-
 Any bot or agent can do the same with an API key: see [API](docs/api.md) and the [minimal client](examples/api-client.sh).
 
 ## How it fits together
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/architecture-dark.png">
-  <img alt="Instinct on WhatsApp, your laptop and the browser all reach one server you own, which pushes notifications to your phone;, which runs the agents, the board and API, the worker and notifications. Nothing is open to the internet unless you turn it on." src="assets/architecture-light.png" width="100%">
-</picture>
 
 - **Agents keep running.** herdr runs as a service that starts at boot. Terminals survive SSH drops and lid closes; after a reboot herdr restores the layout and resumes the agents' conversations.
 - **Move an agent to the server.** One key in herdr forks a local agent, with its conversation and folder, onto the server. The folder then stays in two-way sync.
@@ -48,11 +33,6 @@ Any bot or agent can do the same with an API key: see [API](docs/api.md) and the
 - **Notifications** on your phone when an agent needs you or is done.
 
 ## Quick start
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/install-dark.png">
-  <img alt="Install in three steps: ./install.sh asks a few questions and sets it up; you sign in to Claude and GitHub once; ./doctor.sh shows what is left to fix." src="assets/install-light.png" width="100%">
-</picture>
 
 On your laptop (Linux or macOS):
 

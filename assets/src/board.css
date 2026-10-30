@@ -1,0 +1,33 @@
+/* The board's own look (board/src/index.html): a pink dot-grid desk, black-titled windows, the sunset logo and
+   the Kaushan Script wordmark. Fonts are the board's Google Fonts, kept here so render.sh works offline. */
+@font-face { font-family: "Kaushan Script"; src: url(fonts/KaushanScript.woff2); }
+@font-face { font-family: "Schibsted Grotesk"; src: url(fonts/SchibstedGrotesk.woff2); font-weight: 400 900; }
+@font-face { font-family: "JetBrains Mono"; src: url(fonts/JetBrainsMono.woff2); font-weight: 100 800; }
+@font-face { font-family: VT323; src: url(fonts/VT323.woff2); }
+
+:root { --desk: #F386A1; --paper: #FEFEFE; --panel: #E5E5E5; --ink: #1E1E1E; --muted: #5c5c5c; --neon: #FF4FB4;
+        --work: #03AA5C; --pause: #F2B33D; --pr: #09AEA1;
+        --pixel: VT323, monospace; --mono: "JetBrains Mono", monospace; --sans: "Schibsted Grotesk", sans-serif; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: var(--w); height: var(--h); overflow: hidden; }
+body { font: 16px/1.4 var(--sans); letter-spacing: .02em; color: var(--ink); -webkit-font-smoothing: antialiased;
+       background: var(--desk) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Crect x='2' y='2' width='1' height='1' fill='%231e1e1e'/%3E%3C/svg%3E"); }
+
+.logo { display: flex; align-items: center; gap: .28em; font: 400 1em/1.1 "Kaushan Script", cursive; color: var(--neon);
+        text-shadow: .06em .06em 0 var(--ink); letter-spacing: .03em; }
+.logo img { width: 1.06em; height: 1.06em; content: url(logo/femme.svg); }
+
+.win { border: 1.2px solid var(--ink); background: var(--desk); }
+.tb { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--ink); color: var(--desk); font: 22px/1 var(--pixel); text-transform: lowercase; }
+.frame { display: grid; gap: 3px; padding: 3px; }
+.card { background: var(--paper); border: 1.2px solid var(--ink); padding: 10px 12px; }
+.title { font-size: 17px; font-weight: 500; }
+.cwd { font: 12px/1.4 var(--mono); letter-spacing: .05em; color: var(--muted); }
+.dot { width: 10px; height: 10px; border: 1.2px solid var(--ink); background: var(--paper); flex: none; }
+.dot.working { background: var(--work); } .dot.done { background: var(--pause); }
+.st { font: 18px/1 var(--pixel); padding: 1px 6px; border: 1.2px solid currentColor; }
+.chip { height: 36px; border-radius: 999px; padding: 0 12px; font: 15px/1 var(--sans); background: var(--panel); border: 1.2px solid var(--ink);
+        display: inline-flex; align-items: center; }
+.round { width: 40px; height: 40px; border-radius: 50%; border: 1.2px solid var(--ink); background: var(--paper);
+         display: inline-flex; align-items: center; justify-content: center; font: 24px/1 var(--pixel); }
+.round.dark { background: var(--ink); color: var(--paper); }

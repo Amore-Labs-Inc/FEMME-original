@@ -14,11 +14,7 @@ shot() {  # page width height name [query]
   done
   echo "$4"
 }
-shot banner.html 1280 460 banner
-shot instinct.html 1280 680 instinct
-shot architecture.html 1280 560 architecture
-shot install.html 1280 420 install
-shot features.html 1280 580 features
+shot banner.html 1280 400 banner
 shot footer.html 1280 200 footer
 # GitHub's social preview (repo Settings → Social preview): one image, dark.
 "$chrome" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=1280,640 \

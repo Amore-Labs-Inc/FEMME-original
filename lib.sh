@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared by the laptop-side scripts (sourced, not run). Bash 3.2 safe: macOS ships it.
 
 say() { printf '\033[1m%s\033[0m\n' "$*" >&2; }

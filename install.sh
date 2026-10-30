@@ -117,7 +117,7 @@ What is left for you (FEMME never copies your credentials):
      Then ./doctor.sh again.
 EOF
 [ -z "${BOARD_URL:-}" ] || if [ "${BOARD_PUBLIC:-0}" = 1 ]; then cat <<EOF
-  2. Point a DNS A record for ${BOARD_URL#https://} at ${IP:-your server's IP} (DNS only, no proxy),
+  2. Point a DNS A record for ${BOARD_URL#https://} at ${IP:-the server address} (DNS only, no proxy),
      open ports 80 and 443 if your provider has a firewall, then ./sync.sh once more for the certificate.
 EOF
 else cat <<EOF

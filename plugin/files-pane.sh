@@ -119,6 +119,9 @@ handle() {  # one pasted line
   # file:// URLs (percent-encoded), several per drop. xargs undoes the quoting; a lone apostrophe
   # trips it, and then the whole line is one path.
   paths=$(printf '%s\n' "$text" | xargs -n1 printf '%s\n' 2>/dev/null) || paths=$text
+  # The board pastes a path raw: "a b.txt" splits into one absolute token and some tails. One
+  # absolute token among several means the line is that one path. (Two raw paths at once still split.)
+  [ "$(grep -Ec '^(/|file://)' <<<"$paths")" = 1 ] && [ "$(wc -l <<<"$paths")" -gt 1 ] && paths=$text
   while IFS= read -r p; do
     p=${p#file://}; p=${p#localhost}
     case $p in *%*) p=$(printf '%b' "${p//%/\\x}") ;; esac   # ponytail: a literal backslash in a name is mangled
